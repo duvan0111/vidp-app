@@ -1,0 +1,82 @@
+# Subtitle Generation Service - Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subtitle
+  namespace: vidp
+  labels:
+    app: subtitle
+    tier: microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subtitle
+  template:
+    metadata:
+      labels:
+        app: subtitle
+        tier: microservice
+    spec:
+      containers:
+        - name: subtitle
+          image: vidp/subtitle:latest
+          imagePullPolicy: Never  # Use local image with Minikube
+          ports:
+            - containerPort: 8003
+          env:
+            - name: API_TITLE
+              value: "Video Subtitle Generator API"
+            - name: API_VERSION
+              value: "1.0.0"
+            - name: DEFAULT_MODEL
+              value: "base"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8003
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8003
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: subtitle-storage
+              mountPath: /app/output_videos
+            - name: subtitle-temp
+              mountPath: /app/temp
+      volumes:
+        - name: subtitle-storage
+          emptyDir: {}
+        - name: subtitle-temp
+          emptyDir: {}
+---
+# Subtitle Generation Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: subtitle-service
+  namespace: vidp
+  labels:
+    app: subtitle
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8003
+      targetPort: 8003
+      protocol: TCP
+      name: http
+  selector:
+    app: subtitle

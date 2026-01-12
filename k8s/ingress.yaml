@@ -1,0 +1,36 @@
+# Ingress pour l'accès externe unifié
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vidp-ingress
+  namespace: vidp
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+spec:
+  ingressClassName: nginx
+  rules:
+    # Frontend
+    - host: vidp.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+    # API Backend
+    - host: api.vidp.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: main-app-service
+                port:
+                  number: 8000

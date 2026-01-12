@@ -1,0 +1,74 @@
+# Video Compression Service - Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: downscale
+  namespace: vidp
+  labels:
+    app: downscale
+    tier: microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: downscale
+  template:
+    metadata:
+      labels:
+        app: downscale
+        tier: microservice
+    spec:
+      containers:
+        - name: downscale
+          image: vidp/downscale:latest
+          imagePullPolicy: Never  # Use local image with Minikube
+          ports:
+            - containerPort: 8001
+          env:
+            - name: API_TITLE
+              value: "Video Compression API"
+            - name: API_VERSION
+              value: "1.1.0"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: downscale-storage
+              mountPath: /app/video_storage
+      volumes:
+        - name: downscale-storage
+          emptyDir: {}
+---
+# Video Compression Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: downscale-service
+  namespace: vidp
+  labels:
+    app: downscale
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: http
+  selector:
+    app: downscale

@@ -1,0 +1,80 @@
+# Animal Detection Service - Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: animal-detect
+  namespace: vidp
+  labels:
+    app: animal-detect
+    tier: microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: animal-detect
+  template:
+    metadata:
+      labels:
+        app: animal-detect
+        tier: microservice
+    spec:
+      containers:
+        - name: animal-detect
+          image: vidp/animal-detect:latest
+          imagePullPolicy: Never  # Use local image with Minikube
+          ports:
+            - containerPort: 8004
+          env:
+            - name: API_TITLE
+              value: "YOLO Animal Detection API"
+            - name: API_VERSION
+              value: "1.0.0"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8004
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8004
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: animal-uploads
+              mountPath: /app/uploads
+            - name: animal-outputs
+              mountPath: /app/outputs
+      volumes:
+        - name: animal-uploads
+          emptyDir: {}
+        - name: animal-outputs
+          emptyDir: {}
+---
+# Animal Detection Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: animal-detect-service
+  namespace: vidp
+  labels:
+    app: animal-detect
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8004
+      targetPort: 8004
+      protocol: TCP
+      name: http
+  selector:
+    app: animal-detect

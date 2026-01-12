@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vidp-config
+  namespace: vidp
+data:
+  # Service URLs (internal K8s DNS)
+  LANGSCALE_SERVICE_URL: "http://langscale-service:8002"
+  DOWNSCALE_SERVICE_URL: "http://downscale-service:8001"
+  SUBTITLE_SERVICE_URL: "http://subtitle-service:8003"
+  ANIMAL_DETECT_SERVICE_URL: "http://animal-detect-service:8004"
+  
+  # Main app config
+  APP_NAME: "VidP Kubernetes API"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  
+  # MongoDB config
+  MONGODB_DATABASE: "vidp_db"
+  
+  # CORS
+  CORS_ORIGINS: '["http://localhost:3000","http://frontend-service:3000","*"]'

@@ -1,0 +1,25 @@
+# Dépendances principales FastAPI
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0  # Serveur ASGI pour exécuter FastAPI
+pydantic>=2.5.0
+pydantic-settings>=2.1.0   # Pour la gestion des settings
+python-dotenv>=1.0.0       # Pour lire le fichier .env
+
+# Gestion des fichiers asynchrones
+aiofiles>=23.2.0
+
+# Upload et traitement de fichiers
+python-multipart>=0.0.6    # Pour le support des uploads de fichiers
+
+# Base de données MongoDB (pour usage futur)
+motor>=3.3.0               # Driver MongoDB asynchrone
+pymongo>=4.6.0
+
+# Client HTTP pour communiquer avec les microservices
+httpx>=0.25.0
+
+# Orchestration Kubernetes (pour usage futur)
+kubernetes>=28.1.0
+
+# Utilitaires
+pathlib2>=2.3.7; python_version < "3.4"

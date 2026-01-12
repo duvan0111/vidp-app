@@ -1,0 +1,94 @@
+# Main FastAPI Orchestrator - Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-app
+  namespace: vidp
+  labels:
+    app: main-app
+    tier: orchestrator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: main-app
+  template:
+    metadata:
+      labels:
+        app: main-app
+        tier: orchestrator
+    spec:
+      containers:
+        - name: main-app
+          image: vidp/main-app:latest
+          imagePullPolicy: Never  # Use local image with Minikube
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: vidp-config
+          env:
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vidp-secrets
+                  key: MONGODB_URL
+            - name: LOCAL_STORAGE_ROOT
+              value: "/app/local_storage"
+            - name: LOCAL_VIDEO_PATH
+              value: "/app/local_storage/videos"
+            # Microservices URLs (K8s internal DNS)
+            - name: LANGSCALE_SERVICE_URL
+              value: "http://langscale-service:8002"
+            - name: DOWNSCALE_SERVICE_URL
+              value: "http://downscale-service:8001"
+            - name: SUBTITLE_SERVICE_URL
+              value: "http://subtitle-service:8003"
+            - name: ANIMAL_DETECTION_SERVICE_URL
+              value: "http://animal-detect-service:8004"
+            - name: MICROSERVICES_TIMEOUT
+              value: "1800"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: video-storage
+              mountPath: /app/local_storage
+      volumes:
+        - name: video-storage
+          emptyDir: {}
+---
+# Main App Service (NodePort for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-app-service
+  namespace: vidp
+  labels:
+    app: main-app
+spec:
+  type: NodePort
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+      protocol: TCP
+      name: http
+  selector:
+    app: main-app
