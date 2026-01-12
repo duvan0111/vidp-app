@@ -1,0 +1,32 @@
+{
+  "name": "VidP Frontend Development",
+  "version": "1.0.0",
+  "type": "nextjs",
+  "description": "Configuration de développement pour l'interface VidP",
+  "settings": {
+    "frontend": {
+      "url": "http://localhost:3000",
+      "framework": "Next.js",
+      "language": "TypeScript",
+      "styling": "Tailwind CSS"
+    },
+    "backend": {
+      "url": "http://localhost:8000",
+      "framework": "FastAPI",
+      "endpoint": "/api/v1/videos/upload"
+    },
+    "development": {
+      "autoReload": true,
+      "darkMode": true,
+      "maxFileSize": "500MB",
+      "supportedFormats": ["MP4", "AVI", "MOV"]
+    }
+  },
+  "scripts": {
+    "dev": "npm run dev",
+    "build": "npm run build",
+    "start": "npm run start",
+    "lint": "npm run lint",
+    "check": "./check-env.sh"
+  }
+}
