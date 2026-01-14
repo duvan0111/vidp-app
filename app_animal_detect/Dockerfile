@@ -20,8 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p uploads outputs
+# Note: No persistent directories needed - uses temporary files only
 
 # Expose port
 EXPOSE 8004

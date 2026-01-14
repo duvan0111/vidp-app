@@ -6,16 +6,14 @@ pip install fastapi uvicorn python-multipart opencv-python ultralytics
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 from ultralytics import YOLO
 import numpy as np
 from pathlib import Path
 import shutil
-from typing import List, Dict
-import json
-from datetime import datetime
+from typing import Dict
 import tempfile
 import base64
 
@@ -34,12 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Créer les dossiers nécessaires
-UPLOAD_DIR = Path("uploads")
-OUTPUT_DIR = Path("outputs")
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
-
 # Charger le modèle YOLO
 model = YOLO('yolov8n.pt')
 
@@ -57,11 +49,12 @@ async def root():
     return {
         "message": "API de détection d'animaux avec YOLO",
         "endpoints": {
-            "/detect": "POST - Télécharger une vidéo pour détection",
+            "/detect": "POST - Télécharger une vidéo pour détection (pas de sauvegarde)",
             "/detect/frame": "POST - Détecter sur une seule image",
-            "/models": "GET - Liste des modèles disponibles",
-            "/animals": "GET - Liste des animaux détectables"
-        }
+            "/animals": "GET - Liste des animaux détectables",
+            "/health": "GET - Vérifier l'état de l'API"
+        },
+        "note": "Aucune vidéo n'est conservée sur le serveur"
     }
 
 
@@ -79,8 +72,7 @@ async def get_animals():
 @app.post("/detect")
 async def detect_video(
     file: UploadFile = File(...),
-    confidence_threshold: float = 0.5,
-    save_video: bool = True
+    confidence_threshold: float = 0.5
 ):
     """
     Détecte les animaux dans une vidéo uploadée
@@ -88,7 +80,6 @@ async def detect_video(
     Args:
         file: Fichier vidéo à analyser
         confidence_threshold: Seuil de confiance minimum (0-1)
-        save_video: Sauvegarder la vidéo annotée
     
     Returns:
         JSON avec statistiques et détections par frame
@@ -98,32 +89,26 @@ async def detect_video(
     if not file.filename.endswith(('.mp4', '.avi', '.mov', '.mkv')):
         raise HTTPException(400, "Format vidéo non supporté. Utilisez .mp4, .avi, .mov ou .mkv")
     
-    # Sauvegarder la vidéo uploadée
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    input_path = UPLOAD_DIR / f"input_{timestamp}_{file.filename}"
-    
-    with input_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Traiter la vidéo
+    # Créer un fichier temporaire pour la vidéo uploadée
+    temp_file = None
     try:
-        results = process_video(
-            str(input_path), 
-            confidence_threshold, 
-            save_video,
-            timestamp
-        )
+        # Créer un fichier temporaire
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        shutil.copyfileobj(file.file, temp_file)
+        temp_file.close()
         
-        # Nettoyer le fichier uploadé
-        input_path.unlink()
+        # Traiter la vidéo
+        results = process_video(temp_file.name, confidence_threshold)
         
         return JSONResponse(content=results)
     
     except Exception as e:
-        # Nettoyer en cas d'erreur
-        if input_path.exists():
-            input_path.unlink()
         raise HTTPException(500, f"Erreur lors du traitement: {str(e)}")
+    
+    finally:
+        # Nettoyer le fichier temporaire
+        if temp_file and Path(temp_file.name).exists():
+            Path(temp_file.name).unlink()
 
 
 @app.post("/detect/frame")
@@ -181,9 +166,7 @@ async def detect_frame(file: UploadFile = File(...), confidence_threshold: float
 
 def process_video(
     video_path: str, 
-    conf_threshold: float, 
-    save_output: bool,
-    timestamp: str
+    conf_threshold: float
 ) -> Dict:
     """Traite la vidéo et extrait les détections"""
     
@@ -197,15 +180,6 @@ def process_video(
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    # Préparer l'enregistrement de la vidéo annotée
-    output_video = None
-    output_path = None
-    
-    if save_output:
-        output_path = OUTPUT_DIR / f"output_{timestamp}.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        output_video = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
     
     # Statistiques
     frame_detections = []
@@ -249,16 +223,9 @@ def process_video(
         if frame_data["detections"]:
             frame_detections.append(frame_data)
         
-        # Sauvegarder la frame annotée
-        if save_output and output_video:
-            annotated = results[0].plot()
-            output_video.write(annotated)
-        
         frame_idx += 1
     
     cap.release()
-    if output_video:
-        output_video.release()
     
     # Résultats finaux
     return {
@@ -275,36 +242,8 @@ def process_video(
             "animals_detected": animals_count,
             "frames_with_detections": len(frame_detections)
         },
-        "detailed_detections": frame_detections[:100],  # Limiter à 100 frames pour la réponse
-        "output_video": str(output_path) if save_output else None
+        "detailed_detections": frame_detections[:100]  # Limiter à 100 frames pour la réponse
     }
-
-
-@app.get("/output/{filename}")
-async def get_output_video(filename: str):
-    """Télécharge une vidéo annotée"""
-    file_path = OUTPUT_DIR / filename
-    
-    if not file_path.exists():
-        raise HTTPException(404, "Vidéo non trouvée")
-    
-    return FileResponse(
-        path=file_path,
-        media_type="video/mp4",
-        filename=filename
-    )
-
-
-@app.delete("/output/{filename}")
-async def delete_output(filename: str):
-    """Supprime une vidéo traitée"""
-    file_path = OUTPUT_DIR / filename
-    
-    if not file_path.exists():
-        raise HTTPException(404, "Fichier non trouvé")
-    
-    file_path.unlink()
-    return {"message": f"Fichier {filename} supprimé"}
 
 
 @app.get("/health")

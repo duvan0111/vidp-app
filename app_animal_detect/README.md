@@ -12,9 +12,10 @@ Cette application utilise le modèle YOLOv8 (You Only Look Once) pour détecter 
 - 🖼️ **Détection d'images** : Détection sur des images individuelles
 - 📊 **Statistiques détaillées** : Comptage des animaux, timestamps, confiance
 - 🎯 **Tracking d'objets** : Suivi des animaux à travers les frames
-- 💾 **Sauvegarde de vidéos annotées** : Export des vidéos avec bounding boxes
+- 🗑️ **Pas de stockage** : Aucune vidéo n'est conservée sur le serveur (fichiers temporaires uniquement)
 - 🌐 **API REST** : Interface HTTP facile à utiliser
 - 🔄 **CORS activé** : Compatible avec les applications web front-end
+- ⚡ **Performances optimales** : Utilisation de fichiers temporaires pour un traitement rapide
 
 ## 🐕 Animaux détectables
 
@@ -89,11 +90,12 @@ Page d'accueil avec la liste des endpoints disponibles.
 {
   "message": "API de détection d'animaux avec YOLO",
   "endpoints": {
-    "/detect": "POST - Télécharger une vidéo pour détection",
+    "/detect": "POST - Télécharger une vidéo pour détection (pas de sauvegarde)",
     "/detect/frame": "POST - Détecter sur une seule image",
-    "/models": "GET - Liste des modèles disponibles",
-    "/animals": "GET - Liste des animaux détectables"
-  }
+    "/animals": "GET - Liste des animaux détectables",
+    "/health": "GET - Vérifier l'état de l'API"
+  },
+  "note": "Aucune vidéo n'est conservée sur le serveur"
 }
 ```
 
@@ -110,16 +112,15 @@ Liste toutes les classes détectables par le modèle.
 ```
 
 ### `POST /detect`
-Détecte les animaux dans une vidéo uploadée.
+Détecte les animaux dans une vidéo uploadée. **Aucune vidéo n'est sauvegardée** : le fichier est traité et supprimé immédiatement.
 
 **Paramètres :**
 - `file` (form-data) : Fichier vidéo (.mp4, .avi, .mov, .mkv)
 - `confidence_threshold` (float, optionnel) : Seuil de confiance (0-1, défaut: 0.5)
-- `save_video` (bool, optionnel) : Sauvegarder la vidéo annotée (défaut: true)
 
 **Exemple avec curl :**
 ```bash
-curl -X POST "http://localhost:8000/detect?confidence_threshold=0.5&save_video=true" \
+curl -X POST "http://localhost:8000/detect?confidence_threshold=0.5" \
   -H "accept: application/json" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@video.mp4"
@@ -131,7 +132,7 @@ import requests
 
 url = "http://localhost:8000/detect"
 files = {"file": open("video.mp4", "rb")}
-params = {"confidence_threshold": 0.5, "save_video": True}
+params = {"confidence_threshold": 0.5}
 
 response = requests.post(url, files=files, params=params)
 print(response.json())
@@ -157,10 +158,11 @@ print(response.json())
     },
     "frames_with_detections": 280
   },
-  "detailed_detections": [...],
-  "output_video": "outputs/output_20260109_143052.mp4"
+  "detailed_detections": [...]
 }
 ```
+
+> **Note** : Les détections détaillées sont limitées aux 100 premières frames pour optimiser la taille de la réponse.
 
 ### `POST /detect/frame`
 Détecte les animaux sur une seule image.
@@ -193,22 +195,6 @@ curl -X POST "http://localhost:8000/detect/frame?confidence_threshold=0.5" \
 }
 ```
 
-### `GET /output/{filename}`
-Télécharge une vidéo annotée générée.
-
-**Exemple :**
-```bash
-curl -O "http://localhost:8000/output/output_20260109_143052.mp4"
-```
-
-### `DELETE /output/{filename}`
-Supprime une vidéo traitée du serveur.
-
-**Exemple :**
-```bash
-curl -X DELETE "http://localhost:8000/output/output_20260109_143052.mp4"
-```
-
 ### `GET /health`
 Vérifie l'état de santé de l'API et du modèle.
 
@@ -228,10 +214,12 @@ app_animal_detect/
 ├── main.py              # Application FastAPI principale
 ├── requirements.txt     # Dépendances Python
 ├── yolov8n.pt          # Modèle YOLOv8 (téléchargé automatiquement)
-├── uploads/            # Dossier temporaire pour les vidéos uploadées
-├── outputs/            # Vidéos annotées générées
+├── Dockerfile          # Configuration Docker
+├── CHANGELOG.md        # Historique des modifications
 └── README.md           # Ce fichier
 ```
+
+> **Important** : Cette application ne crée pas de dossiers `uploads/` ou `outputs/`. Tous les fichiers sont gérés en mémoire temporaire et automatiquement supprimés après traitement.
 
 ## 🔧 Configuration
 
@@ -279,7 +267,8 @@ app.add_middleware(
 Si vous rencontrez des erreurs de mémoire :
 - Utilisez un modèle plus petit (yolov8n.pt)
 - Réduisez la résolution des vidéos
-- Traitez moins de frames à la fois
+- Traitez des vidéos plus courtes
+- Vérifiez l'espace disponible dans `/tmp` (utilisé pour les fichiers temporaires)
 
 ### Problèmes OpenCV
 
@@ -300,6 +289,21 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 - **YOLOv8n** : ~45 FPS sur GPU RTX 3080, ~5 FPS sur CPU
 - **YOLOv8s** : ~35 FPS sur GPU RTX 3080, ~3 FPS sur CPU
 - **YOLOv8m** : ~25 FPS sur GPU RTX 3080, ~1.5 FPS sur CPU
+
+## 🔒 Confidentialité et Sécurité
+
+### Gestion des fichiers
+- ✅ **Aucune sauvegarde** : Les vidéos uploadées ne sont jamais conservées
+- ✅ **Fichiers temporaires** : Utilisation de `tempfile` avec suppression automatique
+- ✅ **Nettoyage garanti** : Bloc `finally` pour assurer la suppression même en cas d'erreur
+- ✅ **Pas de traces** : Aucun historique des vidéos traitées
+
+### Recommandations pour la production
+- Ajoutez une authentification (OAuth2, JWT)
+- Implémentez un rate limiting pour éviter les abus
+- Utilisez HTTPS pour le chiffrement des données en transit
+- Configurez des limites de taille de fichiers
+- Ajoutez un système de logs pour l'audit (sans stocker les vidéos)
 
 ## 🤝 Contribution
 
@@ -324,4 +328,4 @@ Projet réalisé dans le cadre du Master 2 Data Science - INF5141 Cloud Computin
 
 ---
 
-**Note** : Cette application est conçue à des fins de démonstration et d'apprentissage. Pour une utilisation en production, considérez l'ajout d'authentification, de rate limiting, et de gestion des erreurs plus robuste.
+**⚠️ Note importante** : Cette application **ne conserve aucune vidéo** sur le serveur. Tous les fichiers uploadés sont automatiquement supprimés après traitement, garantissant ainsi la confidentialité des données. L'application est conçue à des fins de démonstration et d'apprentissage. Pour une utilisation en production, implémentez les mesures de sécurité appropriées mentionnées ci-dessus.

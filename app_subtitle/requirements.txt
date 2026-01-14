@@ -5,6 +5,4 @@ moviepy==2.2.1
 httpx==0.28.1
 python-multipart==0.0.20
 python-dotenv==1.2.1
-whisper-openai==1.0.0
-numpy<2.0.0
-numba>=0.57.0
+whisper-openai==1.1.10

@@ -1,0 +1,22 @@
+# Dossiers temporaires (ne devraient plus être utilisés)
+uploads/
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Modèles YOLO (si nécessaire)
+# *.pt
+
+# Logs
+*.log
+
+# Environment
+.env
+.venv
+env/
+venv/
