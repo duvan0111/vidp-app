@@ -35,9 +35,9 @@ class Settings(BaseSettings):
     downscale_service_url: str = Field(default="http://localhost:8001", env="DOWNSCALE_SERVICE_URL")
     subtitle_service_url: str = Field(default="http://localhost:8003", env="SUBTITLE_SERVICE_URL")
     animal_detection_service_url: str = Field(default="http://localhost:8004", env="ANIMAL_DETECTION_SERVICE_URL")
-    # Timeout augmenté à 30 minutes pour les traitements longs (vidéos volumineuses)
-    microservices_timeout: int = Field(default=1800, env="MICROSERVICES_TIMEOUT")
-    
+    # Timeout augmenté à 1 heure 30 minutes pour les traitements longs (vidéos volumineuses)
+    microservices_timeout: int = Field(default=9000, env="MICROSERVICES_TIMEOUT")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

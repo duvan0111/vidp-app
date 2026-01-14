@@ -302,6 +302,43 @@ const uploadVideo = async (file) => {
 };
 ```
 
+## 📝 Logging
+
+### Configuration des logs
+Le service utilise le système de logging standard d'Uvicorn/FastAPI :
+- **Sortie** : `stdout` et `stderr` uniquement (pas de fichiers)
+- **Niveau** : `info` par défaut
+- **Format** : Logs structurés avec timestamps
+
+### Consulter les logs
+
+#### En développement local
+```bash
+# Les logs s'affichent directement dans le terminal
+python3 main.py
+```
+
+#### Avec Docker
+```bash
+# Suivre les logs en temps réel
+docker logs -f <container-name>
+
+# Afficher les 100 dernières lignes
+docker logs --tail 100 <container-name>
+```
+
+#### Avec Kubernetes
+```bash
+# Suivre les logs d'un pod
+kubectl logs -f <pod-name> -n vidp-processing
+
+# Afficher les logs récents
+kubectl logs --tail=100 <pod-name> -n vidp-processing
+```
+
+### Note importante
+⚠️ **Aucun fichier de log n'est conservé** sur le système de fichiers. Les logs sont gérés par l'orchestrateur (Docker/Kubernetes) et peuvent être collectés via des outils externes (ELK, Grafana Loki, etc.).
+
 ---
 
 **Développé pour le projet VidP - Master 2 DS - INF5141 Cloud Computing**

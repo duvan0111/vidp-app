@@ -55,8 +55,11 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
+# Logs - Not used in this service (stdout/stderr only)
 *.log
+main.log
+
+# Django stuff:
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
