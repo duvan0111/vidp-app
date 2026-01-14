@@ -27,11 +27,12 @@ async def lifespan(app: FastAPI):
     logger.info(f"{Settings.API_TITLE} v{Settings.API_VERSION} started")
     logger.info(f"Storage directory: {Settings.BASE_DIR.absolute()}")
     
-    # Create necessary directories
-    Settings.BASE_DIR.mkdir(parents=True, exist_ok=True)
+    # Create only compressed directory for output (no uploads/downloads storage)
+    Settings.COMPRESSED_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Create temporary directories for processing (will be cleaned automatically)
     Settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     Settings.DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    Settings.COMPRESSED_DIR.mkdir(parents=True, exist_ok=True)
     
     # Create resolution subdirectories
     for resolution in Settings.SUPPORTED_RESOLUTIONS.keys():
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     logger.info("- GET /api/status/{job_id} - Check job status")
     logger.info("- GET /api/download/{job_id} - Download result")
     logger.info("- GET /video_storage/ - Access video files")
+    logger.info("NOTE: Temporary input files are automatically deleted after processing")
 
     yield  # App is running here
 

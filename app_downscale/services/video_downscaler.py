@@ -5,6 +5,7 @@ import time
 import json
 import shutil
 import httpx
+import tempfile
 from datetime import datetime
 from moviepy import VideoFileClip
 
@@ -20,12 +21,15 @@ class VideoDownscaler:
         self.settings = Settings
     
     async def download_video(self, video_url: str, job_id: str) -> Path:
-        """Download video from URL"""
+        """Download video from URL to temporary file"""
+        temp_file = None
         try:
             logger.info(f"Downloading video from {video_url}")
             
-            filename = f"{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-            download_path = self.settings.DOWNLOADS_DIR / filename
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=self.settings.DOWNLOADS_DIR)
+            download_path = Path(temp_file.name)
+            temp_file.close()
             
             async with httpx.AsyncClient(timeout=self.settings.DOWNLOAD_TIMEOUT) as client:
                 async with client.stream('GET', video_url) as response:
@@ -35,52 +39,66 @@ class VideoDownscaler:
                         async for chunk in response.aiter_bytes(chunk_size=8192):
                             f.write(chunk)
             
-            logger.info(f"Video downloaded: {download_path}")
+            logger.info(f"Video downloaded to temporary file: {download_path}")
             return download_path
             
         except httpx.HTTPError as e:
             logger.error(f"Download failed: {str(e)}")
+            if temp_file and Path(temp_file.name).exists():
+                Path(temp_file.name).unlink()
             raise HTTPException(status_code=400, detail=f"Failed to download video: {str(e)}")
         except Exception as e:
             logger.error(f"Unexpected error during download: {str(e)}")
+            if temp_file and Path(temp_file.name).exists():
+                Path(temp_file.name).unlink()
             raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
     
     def copy_local_video(self, local_path: str, job_id: str) -> Path:
-        """Copy local video to working directory"""
+        """Copy local video to temporary file"""
+        temp_file = None
         try:
             logger.info(f"Copying local video from {local_path}")
             
-            original_filename = Path(local_path).name
-            filename = f"{job_id}_{original_filename}"
-            copy_path = self.settings.DOWNLOADS_DIR / filename
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=self.settings.DOWNLOADS_DIR)
+            copy_path = Path(temp_file.name)
+            temp_file.close()
             
             shutil.copy2(local_path, copy_path)
             
-            logger.info(f"Local video copied: {copy_path}")
+            logger.info(f"Local video copied to temporary file: {copy_path}")
             return copy_path
             
         except Exception as e:
             logger.error(f"Failed to copy local video: {str(e)}")
+            if temp_file and Path(temp_file.name).exists():
+                Path(temp_file.name).unlink()
             raise HTTPException(status_code=400, detail=f"Failed to copy local video: {str(e)}")
     
     async def save_uploaded_video(self, file: UploadFile, job_id: str) -> Path:
-        """Save uploaded video file"""
+        """Save uploaded video to temporary file"""
+        temp_file = None
         try:
             logger.info(f"Saving uploaded video: {file.filename}")
             
-            safe_filename = "".join(c for c in file.filename if c.isalnum() or c in (' ', '.', '_', '-')).rstrip()
-            filename = f"{job_id}_{safe_filename}"
-            save_path = self.settings.UPLOADS_DIR / filename
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=self.settings.UPLOADS_DIR)
+            save_path = Path(temp_file.name)
             
-            with open(save_path, 'wb') as f:
-                content = await file.read()
-                f.write(content)
+            # Write uploaded content
+            content = await file.read()
+            temp_file.write(content)
+            temp_file.close()
             
-            logger.info(f"Uploaded video saved: {save_path}")
+            logger.info(f"Uploaded video saved to temporary file: {save_path}")
             return save_path
             
         except Exception as e:
             logger.error(f"Failed to save uploaded video: {str(e)}")
+            if temp_file:
+                temp_file.close()
+                if Path(temp_file.name).exists():
+                    Path(temp_file.name).unlink()
             raise HTTPException(status_code=400, detail=f"Failed to save uploaded video: {str(e)}")
     
     def get_video_metadata(self, clip: VideoFileClip) -> Dict:
@@ -209,3 +227,12 @@ class VideoDownscaler:
                 clip.close()
             if resized_clip is not None:
                 resized_clip.close()
+    
+    def cleanup_temp_file(self, file_path: Path) -> None:
+        """Delete temporary input file after processing"""
+        try:
+            if file_path and file_path.exists():
+                file_path.unlink()
+                logger.info(f"Temporary file cleaned up: {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup temporary file {file_path}: {str(e)}")

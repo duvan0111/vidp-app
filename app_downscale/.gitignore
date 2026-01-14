@@ -1,0 +1,31 @@
+# Logs (no file logging)
+*.log
+
+# Temporary upload/download files (cleaned automatically)
+video_storage/uploads/*
+video_storage/downloads/*
+!video_storage/uploads/.gitkeep
+!video_storage/downloads/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

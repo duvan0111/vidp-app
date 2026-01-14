@@ -64,6 +64,7 @@ async def process_video_from_url(
     custom_filename: Optional[str]
 ) -> dict:
     """Process video compression from URL and return result"""
+    input_path = None
     try:
         job_manager.update_job(
             job_id,
@@ -105,6 +106,10 @@ async def process_video_from_url(
             failed_at=datetime.now().isoformat()
         )
         raise
+    finally:
+        # Clean up temporary input file
+        if input_path:
+            downscaler.cleanup_temp_file(input_path)
 
 async def process_video_from_url_sync(
     job_id: str,
@@ -124,6 +129,7 @@ async def process_local_video(
     custom_filename: Optional[str]
 ) -> dict:
     """Process local video compression and return result"""
+    input_path = None
     try:
         job_manager.update_job(
             job_id,
@@ -165,6 +171,10 @@ async def process_local_video(
             failed_at=datetime.now().isoformat()
         )
         raise
+    finally:
+        # Clean up temporary input file
+        if input_path:
+            downscaler.cleanup_temp_file(input_path)
 
 async def process_local_video_sync(
     job_id: str,
@@ -184,6 +194,7 @@ async def process_uploaded_video(
     custom_filename: Optional[str]
 ) -> dict:
     """Process uploaded video compression and return result"""
+    input_path = None
     try:
         job_manager.update_job(
             job_id,
@@ -225,6 +236,10 @@ async def process_uploaded_video(
             failed_at=datetime.now().isoformat()
         )
         raise
+    finally:
+        # Clean up temporary input file
+        if input_path:
+            downscaler.cleanup_temp_file(input_path)
 
 async def process_uploaded_video_sync(
     job_id: str,

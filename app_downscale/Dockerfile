@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
+# Note: uploads/ and downloads/ are for temporary files only (auto-cleaned)
+# Only compressed/ videos are persisted
 RUN mkdir -p video_storage/uploads \
     video_storage/downloads \
     video_storage/compressed/240p \

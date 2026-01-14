@@ -14,8 +14,10 @@ API professionnelle de compression vidéo construite avec FastAPI. Compressez vo
 - 🎯 **Résolutions multiples** : Support de 240p à 1080p
 - ⚙️ **Qualité ajustable** : Contrôle CRF (18-30) pour équilibrer qualité et taille
 - 🔄 **Traitement asynchrone** : Gestion des jobs avec suivi de statut en temps réel
+- 🗑️ **Nettoyage automatique** : Les vidéos d'entrée sont automatiquement supprimées après compression
 - 📊 **API RESTful** : Documentation interactive avec Swagger UI
 - 🚀 **Performant** : Optimisé avec FFmpeg et MoviePy
+- 🔒 **Confidentialité** : Seules les vidéos compressées sont conservées
 
 ## 📋 Table des matières
 
@@ -425,77 +427,43 @@ app_downscale/
         └── 1080p/
 ```
 
-## 🛠️ Technologies utilisées
-
-- **[FastAPI](https://fastapi.tiangolo.com/)** - Framework web moderne et rapide
-- **[Uvicorn](https://www.uvicorn.org/)** - Serveur ASGI haute performance
-- **[Pydantic](https://pydantic-docs.helpmanual.io/)** - Validation de données
-- **[MoviePy](https://zulko.github.io/moviepy/)** - Manipulation de vidéos
-- **[FFmpeg](https://ffmpeg.org/)** - Traitement multimédia
-- **[HTTPX](https://www.python-httpx.org/)** - Client HTTP asynchrone
-- **[Python-multipart](https://andrew-d.github.io/python-multipart/)** - Gestion des uploads
-
-## 📊 Paramètres de compression
-
-### CRF (Constant Rate Factor)
-
-Le CRF contrôle la qualité de la vidéo :
-- **18-23** : Qualité très élevée (fichiers volumineux)
-- **24-28** : Bon équilibre qualité/taille ⭐ *Recommandé*
-- **29-30** : Qualité réduite (fichiers plus petits)
-
-### Résolutions et cas d'usage
-
-| Résolution | Dimensions | Usage recommandé |
-|------------|-----------|------------------|
-| 1080p | 1920x1080 | Qualité HD, écrans modernes |
-| 720p | 1280x720 | HD standard, bon compromis |
-| 480p | 854x480 | SD, compatibilité maximale |
-| 360p | 640x360 | Mobile, streaming léger |
-| 240p | 426x240 | Très faible bande passante |
-
-## 🔒 Sécurité
-
-- Validation stricte des entrées avec Pydantic
-- Vérification des extensions de fichiers
-- Limite de taille d'upload (1 GB par défaut)
-- Gestion sécurisée des chemins de fichiers
-- Logs détaillés pour l'audit
-
-## 🐛 Dépannage
-
-### FFmpeg non trouvé
-```
-Error: FFmpeg not found
-```
-**Solution :** Installez FFmpeg et vérifiez qu'il est dans le PATH
-```bash
-ffmpeg -version
-```
-
-### Port déjà utilisé
-```
-Error: Address already in use
-```
-**Solution :** Changez le port ou arrêtez le processus existant
-```bash
-uvicorn main:app --port 8002
-```
-
-### Erreur de permission sur video_storage
-```
-Error: Permission denied
-```
-**Solution :** Vérifiez les permissions du dossier
-```bash
-chmod -R 755 video_storage/
-```
-
 ## 📈 Performance
 
 - Compression moyenne : 60-80% de réduction de taille
 - Temps de traitement : ~10-30 secondes pour 1 minute de vidéo (1080p → 360p)
 - Support du traitement parallèle avec Uvicorn workers
+
+## 🔒 Confidentialité et Gestion des Fichiers
+
+### Gestion automatique des fichiers temporaires
+
+- ✅ **Suppression automatique** : Les vidéos uploadées/téléchargées sont supprimées après compression
+- ✅ **Seules les vidéos compressées sont conservées** : dans `video_storage/compressed/`
+- ✅ **Nettoyage garanti** : Bloc `finally` pour assurer la suppression même en cas d'erreur
+- ✅ **Pas de log fichier** : Logging uniquement en console (stdout)
+
+### Structure de stockage
+
+```
+video_storage/
+├── uploads/          # Fichiers temporaires (nettoyés automatiquement)
+├── downloads/        # Fichiers temporaires (nettoyés automatiquement)
+└── compressed/       # Vidéos compressées (conservées)
+    ├── 240p/
+    ├── 360p/
+    ├── 480p/
+    ├── 720p/
+    └── 1080p/
+```
+
+### Recommandations pour la production
+
+- Implémentez un système de nettoyage périodique pour `compressed/`
+- Configurez des limites de quota par utilisateur
+- Ajoutez une authentification (OAuth2, JWT)
+- Implémentez un rate limiting
+- Utilisez HTTPS pour le chiffrement
+- Configurez un système de backup pour les vidéos compressées
 
 ## 🔄 Mises à jour futures
 
