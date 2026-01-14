@@ -29,6 +29,10 @@ async def generate_subtitles(
     - output_format='video': Returns video with burned subtitles.
     - output_format='json': Returns JSON with a DOWNLOAD LINK to the SRT (for aggregation service).
     """
+    # Normalize language parameter (convert "auto" to None for Whisper)
+    if language and language.lower() in ["auto", "none", ""]:
+        language = None
+    
     # 1. Validate file extension
     if not validate_file_extension(video.filename, Settings.ALLOWED_EXTENSIONS):
         raise HTTPException(

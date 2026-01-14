@@ -15,10 +15,10 @@ RUN pip install --no-cache-dir fastapi uvicorn[standard] python-multipart pydant
 # Copy application code
 COPY . .
 
-# Create necessary directories
+# Create temporary directories (files auto-cleaned after processing)
+# Note: No results/ directory - results returned in JSON only
 RUN mkdir -p language_detection_storage/videos \
-    language_detection_storage/audio \
-    language_detection_storage/results
+    language_detection_storage/audio
 
 # Expose port
 EXPOSE 8002

@@ -22,6 +22,8 @@ async def process_detection_job(job_id: str, video_url: str, duration: int, test
         duration: Duration in seconds to analyze
         test_all: Whether to test all supported languages
     """
+    video_path = None
+    audio_path = None
     try:
         # Update status to processing
         detector.jobs[job_id].update({
@@ -55,10 +57,7 @@ async def process_detection_job(job_id: str, video_url: str, duration: int, test
             test_all
         )
         
-        # Save results
-        results_file = detector.save_results(job_id, detection_results)
-        
-        # Prepare response data
+        # Prepare response data (no file saving)
         if detection_results["detected"]:
             message = f"Language detected: {detection_results['language']}"
             transcript_sample = detection_results.get("transcript", "")[:100]
@@ -77,7 +76,7 @@ async def process_detection_job(job_id: str, video_url: str, duration: int, test
             transcript_sample = None
             top_results = []
         
-        # Update job with results
+        # Update job with results (no file reference)
         detector.jobs[job_id].update({
             "status": DetectionStatus.COMPLETED,
             "message": message,
@@ -87,12 +86,10 @@ async def process_detection_job(job_id: str, video_url: str, duration: int, test
             "confidence_score": detection_results.get("confidence"),
             "transcript_sample": transcript_sample,
             "all_results": top_results,
-            "results_file": str(results_file),
             "metadata": {
                 "total_languages_tested": len(SUPPORTED_LANGUAGES),
                 "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
-                "analysis_duration": duration,
-                "video_size_mb": round(video_path.stat().st_size / (1024 * 1024), 2)
+                "analysis_duration": duration
             },
             "completed_at": datetime.now().isoformat()
         })
@@ -109,9 +106,13 @@ async def process_detection_job(job_id: str, video_url: str, duration: int, test
             "error": str(e),
             "failed_at": datetime.now().isoformat()
         })
+    finally:
+        # Clean up temporary files
+        detector.cleanup_temp_files(video_path, audio_path)
 
 async def process_local_detection_job(job_id: str, video_path: str, duration: int, test_all: bool):
     """Process local video file language detection"""
+    audio_path = None
     try:
         detector.jobs[job_id].update({
             "status": DetectionStatus.PROCESSING,
@@ -138,10 +139,7 @@ async def process_local_detection_job(job_id: str, video_path: str, duration: in
             test_all
         )
 
-        # Save results
-        results_file = detector.save_results(job_id, detection_results)
-
-        # Prepare summary
+        # Prepare summary (no file saving)
         if detection_results["detected"]:
             message = f"Language detected: {detection_results['language']}"
             transcript_sample = detection_results.get("transcript", "")[:100]
@@ -167,12 +165,10 @@ async def process_local_detection_job(job_id: str, video_path: str, duration: in
             "confidence_score": detection_results.get("confidence"),
             "transcript_sample": transcript_sample,
             "all_results": top_results,
-            "results_file": str(results_file),
             "metadata": {
                 "total_languages_tested": len(SUPPORTED_LANGUAGES),
                 "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
-                "analysis_duration": duration,
-                "video_size_mb": round(video_path.stat().st_size / (1024 * 1024), 2)
+                "analysis_duration": duration
             },
             "completed_at": datetime.now().isoformat()
         })
@@ -184,23 +180,29 @@ async def process_local_detection_job(job_id: str, video_path: str, duration: in
             "error": str(e),
             "failed_at": datetime.now().isoformat()
         })
+    finally:
+        # Clean up audio file (local video stays)
+        detector.cleanup_temp_files(audio_path=audio_path)
 
 async def process_uploaded_detection_job(job_id: str, file: UploadFile, duration: int, test_all: bool):
     """Process uploaded video file language detection"""
+    video_path = None
+    audio_path = None
+    temp_file = None
     try:
         detector.jobs[job_id].update({
             "status": DetectionStatus.PROCESSING,
             "message": "Saving uploaded video..."
         })
         
-        # Save uploaded file
-        safe_filename = "".join(c for c in file.filename if c.isalnum() or c in (' ', '.', '_', '-')).rstrip()
-        filename = f"{job_id}_{safe_filename}"
-        video_path = detector.videos_dir / filename
+        # Save to temporary file
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=detector.videos_dir)
+        video_path = Path(temp_file.name)
         
-        with open(video_path, 'wb') as f:
-            content = await file.read()
-            f.write(content)
+        content = await file.read()
+        temp_file.write(content)
+        temp_file.close()
         
         detector.jobs[job_id].update({
             "video_path": str(video_path),
@@ -226,10 +228,7 @@ async def process_uploaded_detection_job(job_id: str, file: UploadFile, duration
             test_all
         )
         
-        # Save results
-        results_file = detector.save_results(job_id, detection_results)
-        
-        # Prepare response data
+        # Prepare response data (no file saving)
         if detection_results["detected"]:
             message = f"Language detected: {detection_results['language']}"
             transcript_sample = detection_results.get("transcript", "")[:100]
@@ -248,7 +247,7 @@ async def process_uploaded_detection_job(job_id: str, file: UploadFile, duration
             transcript_sample = None
             top_results = []
         
-        # Update job with results
+        # Update job with results (no file reference)
         detector.jobs[job_id].update({
             "status": DetectionStatus.COMPLETED,
             "message": message,
@@ -258,12 +257,10 @@ async def process_uploaded_detection_job(job_id: str, file: UploadFile, duration
             "confidence_score": detection_results.get("confidence"),
             "transcript_sample": transcript_sample,
             "all_results": top_results,
-            "results_file": str(results_file),
             "metadata": {
                 "total_languages_tested": len(SUPPORTED_LANGUAGES),
                 "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
-                "analysis_duration": duration,
-                "video_size_mb": round(video_path.stat().st_size / (1024 * 1024), 2)
+                "analysis_duration": duration
             },
             "completed_at": datetime.now().isoformat()
         })
@@ -278,3 +275,6 @@ async def process_uploaded_detection_job(job_id: str, file: UploadFile, duration
             "error": str(e),
             "failed_at": datetime.now().isoformat()
         })
+    finally:
+        # Clean up temporary files
+        detector.cleanup_temp_files(video_path, audio_path)

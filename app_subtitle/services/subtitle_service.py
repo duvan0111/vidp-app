@@ -60,8 +60,13 @@ class SubtitleService:
                 "task": "transcribe"
             }
             
-            if language:
+            # Handle language parameter
+            # Whisper expects None for auto-detection, not "auto"
+            if language and language.lower() not in ["auto", "none", ""]:
                 transcribe_options["language"] = language
+                logger.info(f"Using specified language: {language}")
+            else:
+                logger.info("Using automatic language detection")
             
             # Transcribe audio
             result = model.transcribe(str(audio_path), **transcribe_options)

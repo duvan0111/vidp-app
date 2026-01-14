@@ -77,6 +77,8 @@ async def detect_video_language(
         )
     else:
         # Synchronous processing
+        video_path = None
+        audio_path = None
         try:
             # Update status to processing
             detector.jobs[job_id].update({
@@ -110,10 +112,7 @@ async def detect_video_language(
                 request.test_all_languages
             )
             
-            # Save results
-            results_file = detector.save_results(job_id, detection_results)
-            
-            # Prepare response data
+            # Prepare response data (no file saving)
             if detection_results["detected"]:
                 message = f"Language detected: {detection_results['language']}"
                 transcript_sample = detection_results.get("transcript", "")[:100]
@@ -142,7 +141,6 @@ async def detect_video_language(
                 "confidence_score": detection_results.get("confidence"),
                 "transcript_sample": transcript_sample,
                 "all_results": top_results,
-                "results_file": str(results_file),
                 "metadata": {
                     "total_languages_tested": len(SUPPORTED_LANGUAGES),
                     "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
@@ -177,6 +175,9 @@ async def detect_video_language(
                 status_code=500,
                 detail=f"Language detection failed: {str(e)}"
             )
+        finally:
+            # Clean up temporary files (video and audio)
+            detector.cleanup_temp_files(video_path, audio_path)
 
 @router.post("/detect/local", response_model=LanguageDetectionResult)
 async def detect_local_video_language(
@@ -219,6 +220,7 @@ async def detect_local_video_language(
         )
     else:
         # Synchronous processing
+        audio_path = None
         try:
             detector.jobs[job_id].update({
                 "status": DetectionStatus.PROCESSING,
@@ -243,10 +245,7 @@ async def detect_local_video_language(
                 request.test_all_languages
             )
 
-            # Save results
-            results_file = detector.save_results(job_id, detection_results)
-
-            # Prepare summary
+            # Prepare summary (no file saving)
             if detection_results["detected"]:
                 message = f"Language detected: {detection_results['language']}"
                 transcript_sample = detection_results.get("transcript", "")[:100]
@@ -271,7 +270,6 @@ async def detect_local_video_language(
                 "confidence_score": detection_results.get("confidence"),
                 "transcript_sample": transcript_sample,
                 "all_results": top_results,
-                "results_file": str(results_file),
                 "metadata": {
                     "total_languages_tested": len(SUPPORTED_LANGUAGES),
                     "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
@@ -306,6 +304,9 @@ async def detect_local_video_language(
                 status_code=500,
                 detail=f"Language detection failed: {str(e)}"
             )
+        finally:
+            # Clean up audio file (local video file is kept)
+            detector.cleanup_temp_files(audio_path=audio_path)
 
 @router.post("/detect/upload", response_model=LanguageDetectionResult)
 async def detect_uploaded_video_language(
@@ -358,6 +359,8 @@ async def detect_uploaded_video_language(
         )
     else:
         # Synchronous processing
+        video_path = None
+        audio_path = None
         try:
             detector.jobs[job_id].update({
                 "status": DetectionStatus.PROCESSING,
@@ -397,10 +400,7 @@ async def detect_uploaded_video_language(
                 test_all_languages
             )
             
-            # Save results
-            results_file = detector.save_results(job_id, detection_results)
-            
-            # Prepare response data
+            # Prepare response data (no file saving)
             if detection_results["detected"]:
                 message = f"Language detected: {detection_results['language']}"
                 transcript_sample = detection_results.get("transcript", "")[:100]
@@ -429,7 +429,6 @@ async def detect_uploaded_video_language(
                 "confidence_score": detection_results.get("confidence"),
                 "transcript_sample": transcript_sample,
                 "all_results": top_results,
-                "results_file": str(results_file),
                 "metadata": {
                     "total_languages_tested": len(SUPPORTED_LANGUAGES),
                     "languages_recognized": len([t for t in detection_results.get("all_tests", []) if t["recognized"]]),
@@ -464,6 +463,9 @@ async def detect_uploaded_video_language(
                 status_code=500,
                 detail=f"Language detection failed: {str(e)}"
             )
+        finally:
+            # Clean up temporary files (video and audio)
+            detector.cleanup_temp_files(video_path, audio_path)
 
 @router.get("/status/{job_id}", response_model=LanguageDetectionResult)
 async def get_detection_status(job_id: str):

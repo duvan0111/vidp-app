@@ -1,0 +1,32 @@
+# Logs (no file logging)
+*.log
+
+# Temporary files (cleaned automatically)
+language_detection_storage/videos/*
+language_detection_storage/audio/*
+language_detection_storage/results/*
+!language_detection_storage/videos/.gitkeep
+!language_detection_storage/audio/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

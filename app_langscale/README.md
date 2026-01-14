@@ -19,6 +19,7 @@ Une API REST professionnelle pour la détection automatique de la langue parlée
 - [Architecture](#-architecture)
 - [Exemples](#-exemples)
 - [Dépannage](#-dépannage)
+- [Confidentialité et sécurité](#-confidentialité-et-sécurité)
 - [Contributeurs](#-contributeurs)
 
 ## ✨ Fonctionnalités
@@ -104,9 +105,10 @@ pip install -r requirements.txt
 ### 4. Vérifier la structure des dossiers
 
 L'application créera automatiquement les dossiers nécessaires au démarrage :
-- `language_detection_storage/videos/` - Vidéos téléchargées
-- `language_detection_storage/audio/` - Fichiers audio extraits
-- `language_detection_storage/results/` - Résultats de détection
+- `language_detection_storage/videos/` - Fichiers temporaires de vidéos (nettoyés automatiquement)
+- `language_detection_storage/audio/` - Fichiers audio temporaires (nettoyés automatiquement)
+
+> ⚠️ **Note de confidentialité** : Les vidéos uploadées et les fichiers audio sont automatiquement supprimés après traitement. Les résultats de détection sont uniquement retournés via l'API (pas de sauvegarde sur disque).
 
 ## ⚙️ Configuration
 
@@ -486,7 +488,7 @@ curl http://localhost:8002/api/stats
 
 ## 📊 Logs
 
-Les logs sont enregistrés dans `language_detection_api.log` et affichés dans la console.
+Les logs sont enregistrés uniquement dans la console (stdout/stderr) pour faciliter l'intégration avec des systèmes de logging centralisés en production.
 
 Niveaux de log :
 - **INFO** : Opérations normales
@@ -494,13 +496,86 @@ Niveaux de log :
 - **ERROR** : Erreurs de traitement
 - **DEBUG** : Informations de débogage détaillées
 
+> 💡 **Astuce** : En production, redirigez la sortie vers un système de logging comme ELK, Loki, ou CloudWatch.
+
+## 🔒 Confidentialité et sécurité
+
+### Gestion des données
+
+Cette API a été conçue avec la confidentialité et la sécurité en tête :
+
+#### ✅ Suppression automatique des fichiers
+
+- **Vidéos uploadées** : Supprimées immédiatement après extraction audio
+- **Fichiers audio** : Supprimés immédiatement après traitement
+- **Résultats de détection** : Retournés uniquement via l'API (pas de sauvegarde sur disque)
+- **Fichiers temporaires** : Nettoyage garanti via blocs `finally` même en cas d'erreur
+
+#### 📝 Logging sécurisé
+
+- Logs en console uniquement (pas de fichier log persistant)
+- Aucune information sensible dans les logs
+- Compatible avec les systèmes de logging centralisés (ELK, Loki, CloudWatch)
+
+#### 🔐 Bonnes pratiques recommandées
+
+Pour un environnement de production :
+
+1. **Authentification** : Ajoutez OAuth2 ou JWT
+   ```python
+   from fastapi.security import OAuth2PasswordBearer
+   oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+   ```
+
+2. **Rate Limiting** : Limitez le nombre de requêtes par IP
+   ```python
+   from slowapi import Limiter
+   limiter = Limiter(key_func=get_remote_address)
+   ```
+
+3. **CORS** : Restreignez les origines autorisées
+   ```python
+   app.add_middleware(
+       CORSMiddleware,
+       allow_origins=["https://votre-domaine.com"],
+       allow_credentials=True,
+       allow_methods=["POST", "GET"],
+       allow_headers=["*"],
+   )
+   ```
+
+4. **HTTPS** : Utilisez un reverse proxy (Nginx, Traefik) avec certificat SSL
+
+5. **Monitoring** : Surveillez les métriques et les erreurs
+   - Prometheus + Grafana
+   - DataDog
+   - New Relic
+
+### Limitations et avertissements
+
+⚠️ **Points d'attention** :
+
+- L'API utilise Google Speech Recognition qui envoie l'audio à Google
+- Connexion internet requise pour la reconnaissance vocale
+- Les vidéos sont temporairement stockées en mémoire/disque pendant le traitement
+- Limite de taille : 100 MB par défaut (modifiable dans `settings.py`)
+
+### Conformité RGPD
+
+Pour une conformité RGPD complète :
+
+- ✅ Minimisation des données : Seul l'audio nécessaire est extrait
+- ✅ Durée de conservation : Fichiers supprimés immédiatement après traitement
+- ✅ Droit à l'oubli : Aucune donnée persistante à supprimer
+- ⚠️ Transfert de données : Audio envoyé à Google (hors UE) - informez vos utilisateurs
+
 ## 🔒 Sécurité
 
 ⚠️ **Notes importantes** :
 
 - Cette API utilise Google Speech Recognition qui nécessite une connexion internet
-- Les fichiers uploadés sont stockés temporairement sur le serveur
-- Nettoyez régulièrement le dossier `language_detection_storage`
+- Les fichiers uploadés sont stockés temporairement pendant le traitement puis automatiquement supprimés
+- Aucune donnée n'est conservée après le traitement
 - En production, ajoutez l'authentification et limitez les CORS
 
 ## 🚀 Déploiement en production
@@ -556,10 +631,31 @@ Ce projet est sous licence MIT - voir le fichier LICENSE pour plus de détails.
 Pour toute question ou problème :
 - Ouvrez une issue sur GitHub
 - Consultez la documentation interactive sur `/docs`
-- Vérifiez les logs dans `language_detection_api.log`
+- Vérifiez les logs dans la console
 
 ---
 
-**Version** : 1.1.0  
-**Date** : Décembre 2025  
+**Version** : 1.2.1  
+**Date** : Janvier 2025  
 **Équipe** : VidP Team
+
+### 🔄 Changelog
+
+**v1.2.1** (14 Janvier 2025)
+- 🐛 **FIX** : Correction du nettoyage automatique en mode synchrone
+- ✅ Ajout de blocs `finally` dans les 3 endpoints synchrones
+- ✅ Garantie de suppression même en cas d'erreur
+- ✅ Tests de vérification effectués
+
+**v1.2.0** (Janvier 2025)
+- ✅ Suppression automatique des vidéos uploadées après traitement
+- ✅ Suppression automatique des fichiers audio extraits
+- ✅ Résultats retournés uniquement via l'API (pas de sauvegarde disque)
+- ✅ Logging en console uniquement (pas de fichier log)
+- ✅ Amélioration de la confidentialité et de la sécurité
+- ✅ Documentation mise à jour avec section confidentialité
+
+**v1.1.0** (Décembre 2024)
+- Support de 15 langues
+- Mode asynchrone/synchrone
+- Upload de fichiers jusqu'à 100MB

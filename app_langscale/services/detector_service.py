@@ -8,6 +8,7 @@ from datetime import datetime
 from utils.constants import SUPPORTED_LANGUAGES
 import logging
 import json
+import tempfile
 from typing import Dict
 from fastapi import HTTPException
 
@@ -23,17 +24,15 @@ class VideoLanguageDetector:
         Initialize the video language detector
         
         Args:
-            base_dir: Base directory for storing videos and audio files
+            base_dir: Base directory for storing temporary files
         """
         self.base_dir = Path(base_dir)
         self.videos_dir = self.base_dir / "videos"
         self.audio_dir = self.base_dir / "audio"
-        self.results_dir = self.base_dir / "results"
         
-        # Create directories
+        # Create temporary directories (files will be cleaned automatically)
         self.videos_dir.mkdir(parents=True, exist_ok=True)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
-        self.results_dir.mkdir(parents=True, exist_ok=True)
         
         # Job storage
         self.jobs: Dict[str, Dict] = {}
@@ -43,24 +42,25 @@ class VideoLanguageDetector:
     
     async def download_video(self, video_url: str, job_id: str) -> Path:
         """
-        Download video from URL
+        Download video from URL to temporary file
         
         Args:
             video_url: URL of the video to download
             job_id: Unique job identifier
             
         Returns:
-            Path: Path to the downloaded video file
+            Path: Path to the downloaded temporary video file
             
         Raises:
             HTTPException: If download fails
         """
+        temp_file = None
         try:
             logger.info(f"Downloading video from {video_url}")
             
-            # Generate unique filename
-            filename = f"{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-            download_path = self.videos_dir / filename
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=self.videos_dir)
+            download_path = Path(temp_file.name)
             
             # Download with streaming
             async with httpx.AsyncClient(timeout=300.0) as client:
@@ -68,20 +68,29 @@ class VideoLanguageDetector:
                     response.raise_for_status()
                     
                     total_size = 0
-                    with open(download_path, 'wb') as f:
-                        async for chunk in response.aiter_bytes(chunk_size=8192):
-                            f.write(chunk)
-                            total_size += len(chunk)
+                    for chunk in response.iter_bytes(chunk_size=8192):
+                        temp_file.write(chunk)
+                        total_size += len(chunk)
+            
+            temp_file.close()
             
             file_size_mb = total_size / (1024 * 1024)
-            logger.info(f"Video downloaded: {download_path} ({file_size_mb:.2f} MB)")
+            logger.info(f"Video downloaded to temporary file: {download_path} ({file_size_mb:.2f} MB)")
             return download_path
             
         except httpx.HTTPError as e:
             logger.error(f"Download failed: {str(e)}")
+            if temp_file:
+                temp_file.close()
+                if Path(temp_file.name).exists():
+                    Path(temp_file.name).unlink()
             raise HTTPException(status_code=400, detail=f"Failed to download video: {str(e)}")
         except Exception as e:
             logger.error(f"Unexpected error during download: {str(e)}")
+            if temp_file:
+                temp_file.close()
+                if Path(temp_file.name).exists():
+                    Path(temp_file.name).unlink()
             raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
     
     def extract_audio(self, video_path: Path, audio_path: Path) -> bool:
@@ -261,22 +270,24 @@ class VideoLanguageDetector:
         
         return test_result
     
-    def save_results(self, job_id: str, results: Dict) -> Path:
+    def cleanup_temp_files(self, video_path: Path = None, audio_path: Path = None) -> None:
         """
-        Save detection results to JSON file
+        Clean up temporary files
         
         Args:
-            job_id: Unique job identifier
-            results: Detection results dictionary
-            
-        Returns:
-            Path: Path to the saved results file
+            video_path: Path to temporary video file
+            audio_path: Path to temporary audio file
         """
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        results_file = self.results_dir / f"{job_id}_results_{timestamp}.json"
+        if video_path and video_path.exists():
+            try:
+                video_path.unlink()
+                logger.info(f"Temporary video file cleaned: {video_path}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup video file {video_path}: {str(e)}")
         
-        with open(results_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        
-        logger.info(f"Results saved: {results_file}")
-        return results_file
+        if audio_path and audio_path.exists():
+            try:
+                audio_path.unlink()
+                logger.info(f"Temporary audio file cleaned: {audio_path}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup audio file {audio_path}: {str(e)}")

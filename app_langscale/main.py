@@ -25,11 +25,10 @@ async def lifespan(app: FastAPI):
     logger.info("Service: VidP Team")
     logger.info(f"Version: {Settings.API_VERSION}")
     
-    # Create directories
+    # Create temporary directories (files cleaned automatically)
     Settings.BASE_DIR.mkdir(parents=True, exist_ok=True)
     Settings.VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
     Settings.AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-    Settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     
     logger.info("API routes loaded successfully")
     logger.info("Available endpoints:")
@@ -39,6 +38,7 @@ async def lifespan(app: FastAPI):
     logger.info("- GET /api/status/{job_id} - Check job status")
     logger.info("- GET /api/languages - Get supported languages")
     logger.info("- GET /api/stats - Get API statistics")
+    logger.info("NOTE: Temporary files (videos/audio) are automatically deleted after processing")
 
     yield  # Application runs here
 

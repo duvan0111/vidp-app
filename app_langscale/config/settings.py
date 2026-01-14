@@ -12,11 +12,10 @@ class Settings:
     ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv']
     MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
     
-    # Directories
+    # Directories (temporary files only)
     BASE_DIR = Path("language_detection_storage")
-    VIDEOS_DIR = BASE_DIR / "videos"
-    AUDIO_DIR = BASE_DIR / "audio"
-    RESULTS_DIR = BASE_DIR / "results"
+    VIDEOS_DIR = BASE_DIR / "videos"  # Temporary videos (auto-cleaned)
+    AUDIO_DIR = BASE_DIR / "audio"    # Temporary audio (auto-cleaned)
     
     # Detection settings
     DEFAULT_DURATION = 30  # seconds
