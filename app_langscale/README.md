@@ -29,6 +29,7 @@ Une API REST professionnelle pour la détection automatique de la langue parlée
 - ⬆️ **Upload de fichiers** : Téléchargez et analysez des vidéos (jusqu'à 100MB)
 - 🔄 **Modes asynchrone et synchrone** : Choisissez entre traitement immédiat ou en arrière-plan
 - 🌍 **15 langues supportées** : Français, Anglais, Espagnol, Allemand, et plus
+- ⚡ **Détection optimisée** : Arrêt automatique dès qu'une langue est détectée (pas de tests inutiles)
 - 📊 **Suivi des tâches** : Vérifiez le statut de vos jobs en temps réel
 - 🧹 **Nettoyage automatique** : Gestion intelligente des fichiers temporaires
 - 📈 **Statistiques API** : Suivez l'utilisation de l'API
@@ -345,6 +346,27 @@ app_langscale/
 4. **Extraction audio** : Conversion vidéo → audio WAV via FFmpeg
 5. **Détection** : Analyse de l'audio avec Google Speech Recognition
 6. **Résultat** : Retour de la langue détectée avec niveau de confiance
+
+### Optimisation des performances
+
+⚡ **Arrêt anticipé de la détection** : 
+
+Lorsque `test_all_languages=true`, l'API teste les langues dans l'ordre de `SUPPORTED_LANGUAGES`. Dès qu'une langue est reconnue avec succès, **le test s'arrête immédiatement** sans tester les autres langues.
+
+**Avantages** :
+- ✅ Réduction du temps de traitement (jusqu'à 93% plus rapide)
+- ✅ Économie de bande passante (moins d'appels à l'API Google)
+- ✅ Résultats plus rapides pour l'utilisateur
+
+**Exemple** :
+```
+Langues testées : Français, Anglais, Espagnol, ...
+→ Français détecté ✅
+→ Arrêt du test (Anglais, Espagnol, etc. ne sont pas testés)
+Temps gagné : ~13 secondes (14 langues non testées)
+```
+
+**Note** : L'ordre des langues dans `SUPPORTED_LANGUAGES` peut être ajusté selon vos besoins (placez les langues les plus fréquentes en premier).
 
 ## 📝 Exemples
 

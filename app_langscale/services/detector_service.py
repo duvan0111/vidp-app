@@ -172,7 +172,7 @@ class VideoLanguageDetector:
                 audio_data = self.recognizer.record(source, duration=duration)
                 
                 if test_all:
-                    # Test each supported language
+                    # Test each supported language (stop when one is detected)
                     for language_code, language_display, language_name in SUPPORTED_LANGUAGES:
                         test_result = self._test_language(
                             audio_data,
@@ -182,8 +182,8 @@ class VideoLanguageDetector:
                         )
                         results["all_tests"].append(test_result)
                         
-                        # If we found a match and haven't detected a language yet
-                        if test_result["recognized"] and not results["detected"]:
+                        # If we found a match, stop testing other languages
+                        if test_result["recognized"]:
                             results.update({
                                 "detected": True,
                                 "language": language_display,
@@ -192,7 +192,8 @@ class VideoLanguageDetector:
                                 "transcript": test_result["transcript"],
                                 "confidence": test_result["confidence"]
                             })
-                            logger.info(f"Language detected: {language_display}")
+                            logger.info(f"✅ Language detected: {language_display} - Stopping further tests")
+                            break  # Stop testing other languages
                 else:
                     # Try automatic detection
                     try:
