@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from config.settings import Settings
 from utils.timestamp_utils import format_srt_timestamp
+from utils.language_utils import normalize_language_code
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +61,13 @@ class SubtitleService:
                 "task": "transcribe"
             }
             
-            # Handle language parameter
-            # Whisper expects None for auto-detection, not "auto"
-            if language and language.lower() not in ["auto", "none", ""]:
-                transcribe_options["language"] = language
-                logger.info(f"Using specified language: {language}")
+            # Normalize language parameter
+            # Converts "Espagnol" -> "es", "auto" -> None, etc.
+            normalized_language = normalize_language_code(language)
+            
+            if normalized_language:
+                transcribe_options["language"] = normalized_language
+                logger.info(f"Using specified language: {normalized_language}")
             else:
                 logger.info("Using automatic language detection")
             

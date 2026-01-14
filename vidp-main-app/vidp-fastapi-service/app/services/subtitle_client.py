@@ -76,12 +76,13 @@ class SubtitleClient:
                     )
                     response.raise_for_status()
                     
-                    # La réponse est le texte transcrit
-                    subtitle_text = response.text
+                    # La réponse est un JSON contenant full_text et srt_url
+                    response_data = response.json()
                     
                     return {
                         "status": "completed",
-                        "subtitle_text": subtitle_text,
+                        "full_text": response_data.get("full_text", ""),
+                        "srt_url": response_data.get("srt_url"),
                         "model_name": model_name,
                         "language": language
                     }

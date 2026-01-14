@@ -33,6 +33,7 @@ from app.services.subtitle_client import subtitle_client
 from app.services.animal_detection_client import animal_detection_client
 from app.db.mongodb_connector import mongodb_connector
 from app.core.config import settings
+from app.utils.language_utils import normalize_language_code
 
 # Création du router pour les endpoints de traitement
 router = APIRouter(prefix="/processing", tags=["processing"])
@@ -267,6 +268,15 @@ async def start_subtitle_generation_with_upload(
     Lance la génération de sous-titres avec upload direct.
     """
     try:
+        # Normaliser la langue avant tout traitement
+        try:
+            normalized_language = normalize_language_code(language)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        
         video_id = str(uuid.uuid4())
         
         # Créer un répertoire temporaire
@@ -290,7 +300,7 @@ async def start_subtitle_generation_with_upload(
         result = await subtitle_client.generate_subtitles(
             video_path=str(temp_file_path),
             model_name=model_size,
-            language=language
+            language=normalized_language  # Utiliser la langue normalisée
         )
         
         # Nettoyer
@@ -311,11 +321,18 @@ async def start_subtitle_generation_with_upload(
         
         job_id = str(uuid.uuid4())
         
+        # Extraire le texte complet et créer une preview
+        subtitle_text_full = result.get("full_text", "")
+        subtitle_text_preview = subtitle_text_full[:500] + "..." if len(subtitle_text_full) > 500 else subtitle_text_full
+        
         subtitle_result = {
             "job_id": job_id,
             "model_name": model_size,
-            "language": language,
-            "subtitle_text": result.get("subtitle_text"),
+            "language": normalized_language,  # Stocker le code ISO normalisé
+            "subtitle_text": subtitle_text_full,  # Texte complet
+            "subtitle_text_preview": subtitle_text_preview,  # Preview pour l'API
+            "text_length": len(subtitle_text_full),  # Longueur du texte
+            "srt_url": result.get("srt_url"),  # URL de téléchargement du fichier SRT
             "completed_at": datetime.now().isoformat()
         }
         
@@ -763,6 +780,15 @@ async def start_subtitle_generation(request: SubtitleRequest):
     Lance la génération de sous-titres.
     """
     try:
+        # Normaliser la langue avant tout traitement
+        try:
+            normalized_language = normalize_language_code(request.language)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        
         if not mongodb_connector.client:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -789,7 +815,7 @@ async def start_subtitle_generation(request: SubtitleRequest):
         result = await subtitle_client.generate_subtitles(
             video_path=video_metadata.file_path,
             model_name=request.model_name,
-            language=request.language
+            language=normalized_language  # Utiliser la langue normalisée
         )
         
         # Vérifier le résultat
@@ -805,12 +831,19 @@ async def start_subtitle_generation(request: SubtitleRequest):
         
         job_id = str(uuid.uuid4())
         
+        # Extraire le texte complet et créer une preview
+        subtitle_text_full = result.get("full_text", "")
+        subtitle_text_preview = subtitle_text_full[:500] + "..." if len(subtitle_text_full) > 500 else subtitle_text_full
+        
         # Sauvegarder le résultat dans MongoDB
         subtitle_result = {
             "job_id": job_id,
             "model_name": request.model_name,
-            "language": request.language,
-            "subtitle_text": result.get("subtitle_text"),
+            "language": normalized_language,  # Stocker le code ISO normalisé
+            "subtitle_text": subtitle_text_full,  # Texte complet
+            "subtitle_text_preview": subtitle_text_preview,  # Preview pour l'API
+            "text_length": len(subtitle_text_full),  # Longueur du texte
+            "srt_url": result.get("srt_url"),  # URL de téléchargement du fichier SRT
             "completed_at": datetime.now().isoformat()
         }
         
@@ -874,6 +907,7 @@ async def get_subtitle_result(video_id: str):
             model_name=result.get("model_name"),
             detected_language=result.get("language"),
             subtitle_text=result.get("subtitle_text"),
+            subtitle_text_preview=result.get("subtitle_text_preview"),
             completed_at=result.get("completed_at")
         )
         
@@ -1205,6 +1239,18 @@ async def process_video_global(
             if detected:
                 lang_to_use = detected
         
+        # Normaliser la langue avant de l'envoyer au microservice
+        # Convertit "Espagnol" -> "es", "auto" -> None, etc.
+        try:
+            lang_to_use = normalize_language_code(lang_to_use)
+        except ValueError as e:
+            result.subtitle_generation = stage_result
+            return await handle_pipeline_failure(
+                "subtitle_generation",
+                f"Langue invalide : {str(e)}",
+                stage_result
+            )
+        
         # Lancer la génération
         sub_result = await subtitle_client.generate_subtitles(
             video_path=video_path_for_processing,
@@ -1226,15 +1272,23 @@ async def process_video_global(
         
         # Succès
         stage_result.status = ProcessingStatus.COMPLETED
+        
+        # Extraire le texte complet depuis la clé "full_text"
+        subtitle_text_full = sub_result.get("full_text", "")
+        subtitle_text_preview = subtitle_text_full[:500] + "..." if len(subtitle_text_full) > 500 else subtitle_text_full
+        
         stage_result.result = {
             "model_name": subtitle_model,
             "language": lang_to_use,
-            "subtitle_text": sub_result.get("subtitle_text", "")[:500] + "..."  # Preview
+            "subtitle_text": subtitle_text_full,  # Texte complet
+            "subtitle_text_preview": subtitle_text_preview,  # Preview pour l'API
+            "text_length": len(subtitle_text_full),  # Longueur du texte
+            "srt_url": sub_result.get("srt_url"),  # URL de téléchargement du fichier SRT
         }
         result.success_count += 1
         stages_completed.append("subtitle_generation")
         
-        # Sauvegarder dans MongoDB
+        # Sauvegarder dans MongoDB (avec texte complet)
         try:
             await mongodb_connector.save_processing_result(
                 video_id=video_id,

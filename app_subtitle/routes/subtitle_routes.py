@@ -11,6 +11,7 @@ from utils.logging_config import logger
 from config.settings import Settings
 from services.video_processor import VideoProcessor
 from utils.file_utils import validate_file_extension, save_uploaded_file, cleanup_file
+from utils.language_utils import normalize_language_code
 
 router = APIRouter(prefix="/api", tags=["subtitle"])
 processor = VideoProcessor()
@@ -29,9 +30,12 @@ async def generate_subtitles(
     - output_format='video': Returns video with burned subtitles.
     - output_format='json': Returns JSON with a DOWNLOAD LINK to the SRT (for aggregation service).
     """
-    # Normalize language parameter (convert "auto" to None for Whisper)
-    if language and language.lower() in ["auto", "none", ""]:
-        language = None
+    # Normalize language parameter
+    # Handles: "auto" -> None, "Espagnol" -> "es", "Spanish" -> "es", etc.
+    try:
+        language = normalize_language_code(language)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     # 1. Validate file extension
     if not validate_file_extension(video.filename, Settings.ALLOWED_EXTENSIONS):

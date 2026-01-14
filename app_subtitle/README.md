@@ -347,7 +347,6 @@ app_subtitle/
 │
 ├── main.py                      # Point d'entrée de l'application
 ├── requirements.txt             # Dépendances Python
-├── video_subtitle_api.log       # Fichier de logs
 ├── README.md                    # Documentation
 │
 ├── config/                      # Configuration
@@ -517,14 +516,14 @@ uvicorn main:app --port 8004
 
 ### Logs
 
-Les logs sont enregistrés dans :
-- **Console** : Affichage en temps réel
-- **Fichier** : `video_subtitle_api.log`
+Les logs sont enregistrés uniquement dans la **console** (stdout/stderr) pour faciliter l'intégration avec des systèmes de logging centralisés en production.
 
 Pour activer les logs détaillés :
 ```bash
 uvicorn main:app --log-level debug
 ```
+
+> 💡 **Astuce** : En production, redirigez la sortie vers un système de logging comme ELK, Loki, ou CloudWatch.
 
 ## 📊 Performance
 
@@ -576,7 +575,7 @@ Pour contribuer au projet :
 
 Pour toute question ou problème :
 - Consulter la documentation : http://localhost:8003/docs
-- Vérifier les logs : `video_subtitle_api.log`
+- Vérifier les logs dans la console
 - Créer une issue sur le repository du projet
 
 ---

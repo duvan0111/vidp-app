@@ -163,7 +163,8 @@ class SubtitleResult(BaseModel):
     status: ProcessingStatus
     model_name: Optional[str] = None
     detected_language: Optional[str] = None
-    subtitle_text: Optional[str] = None
+    subtitle_text: Optional[str] = None  # Texte complet de transcription
+    subtitle_text_preview: Optional[str] = None  # Preview (500 caractères)
     subtitle_path: Optional[str] = None
     processing_time: Optional[float] = None
     error_message: Optional[str] = None

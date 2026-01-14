@@ -24,6 +24,8 @@ VidP est une plateforme web pour l'upload, le stockage et le traitement de fichi
 - [`INTERFACE_GUIDE.md`](INTERFACE_GUIDE.md) - Guide d'utilisation complet
 - [`INTERFACE_FEATURES.md`](vidp-nextjs-web/INTERFACE_FEATURES.md) - Détails techniques
 - [`MICROSERVICES_INTEGRATION.md`](MICROSERVICES_INTEGRATION.md) - Intégration des microservices
+- [`SUBTITLE_METADATA_UPDATE.md`](SUBTITLE_METADATA_UPDATE.md) - Mise à jour structure MongoDB sous-titres
+- [`SUBTITLE_FORMAT_UPDATE.md`](SUBTITLE_FORMAT_UPDATE.md) - Alignement format de retour app_subtitle
 
 ### Architecture
 
