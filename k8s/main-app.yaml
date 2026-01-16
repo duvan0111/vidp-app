@@ -46,6 +46,8 @@ spec:
               value: "http://subtitle-service:8003"
             - name: ANIMAL_DETECTION_SERVICE_URL
               value: "http://animal-detect-service:8004"
+            - name: AGGREGATION_SERVICE_URL
+              value: "http://aggregation-service:8005"
             - name: MICROSERVICES_TIMEOUT
               value: "1800"
           resources:

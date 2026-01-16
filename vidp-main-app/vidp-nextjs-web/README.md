@@ -6,13 +6,15 @@ Cette application Next.js fournit une interface utilisateur moderne pour le syst
 
 Développer une interface frontend en Next.js qui sert d'interface utilisateur au service backend FastAPI, permettant aux utilisateurs de soumettre des vidéos pour le traitement initial avec un design moderne et réactif.
 
-## 🚀 Nouveauté v1.1 : Traitement Global Intégré
+## 🚀 Nouveauté v1.2 : Pipeline Complet à 5 Étapes
 
-L'interface intègre maintenant le **pipeline de traitement global** permettant d'orchestrer automatiquement les 3 microservices :
+L'interface intègre maintenant le **pipeline de traitement global complet** permettant d'orchestrer automatiquement les 5 microservices :
 
 - 🌍 **Détection de langue** - Identifie automatiquement la langue de la vidéo
 - 📐 **Compression vidéo** - Réduit la taille avec résolution configurable
 - 📝 **Génération de sous-titres** - Utilise Whisper AI pour générer les sous-titres
+- 🐾 **Détection d'animaux** - Analyse YOLO pour détecter les animaux
+- 🎬 **Agrégation** - Incruste les sous-titres dans la vidéo finale
 
 ### Fonctionnalités du traitement global
 
@@ -21,6 +23,7 @@ L'interface intègre maintenant le **pipeline de traitement global** permettant 
 - ✅ **Paramètres avancés** : Résolution, qualité, modèle Whisper, langue
 - ✅ **Feedback en temps réel** : Progression de l'upload et du traitement
 - ✅ **Résultats détaillés** : Affichage des résultats par étape avec durée
+- ✅ **Vidéo finale** : Lien direct vers la vidéo avec sous-titres incrustés
 
 ## 🏗️ Architecture et Stack
 

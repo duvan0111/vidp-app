@@ -31,9 +31,11 @@ from app.services.langscale_client import language_detection_client
 from app.services.downscale_client import compression_client
 from app.services.subtitle_client import subtitle_client
 from app.services.animal_detection_client import animal_detection_client
+from app.services.aggregation_client import aggregation_client
 from app.db.mongodb_connector import mongodb_connector
 from app.core.config import settings
 from app.utils.language_utils import normalize_language_code
+from app.utils.video_utils import check_video_has_audio, create_empty_srt_content
 
 # Création du router pour les endpoints de traitement
 router = APIRouter(prefix="/processing", tags=["processing"])
@@ -1018,6 +1020,13 @@ async def process_video_global(
     # Utiliser le chemin permanent pour le traitement
     video_path_for_processing = permanent_file_path
     
+    # ============================================================
+    # DÉTECTION DE LA PISTE AUDIO
+    # ============================================================
+    # Vérifie si la vidéo a une piste audio pour adapter le pipeline
+    has_audio = check_video_has_audio(video_path_for_processing)
+    print(f"🔊 Piste audio détectée: {has_audio}")
+    
     # Helper function pour échec global
     async def handle_pipeline_failure(stage_name: str, error_msg: str, stage_result: ProcessingStageResult):
         """Gère l'échec d'une étape et arrête le pipeline"""
@@ -1047,82 +1056,103 @@ async def process_video_global(
         return result
     
     # ============================================================
-    # ÉTAPE 1: DÉTECTION DE LANGUE (OBLIGATOIRE)
+    # ÉTAPE 1: DÉTECTION DE LANGUE (SAUTÉE SI PAS D'AUDIO)
     # ============================================================
-    # Mettre à jour l'étape actuelle
-    try:
-        await mongodb_connector.update_processing_stage(
-            video_id, "language_detection", stages_completed, stages_failed
-        )
-    except Exception as e:
-        print(f"Erreur update stage: {e}")
-    
-    stage_start = datetime.now()
-    stage_result = ProcessingStageResult(
-        stage=ProcessingStage.LANGUAGE_DETECTION,
-        status=ProcessingStatus.PROCESSING,
-        started_at=stage_start
-    )
-    
-    try:
-        # Vérifier le service
-        service_healthy = await language_detection_client.check_service_health()
-        if not service_healthy:
-            result.language_detection = stage_result
-            return await handle_pipeline_failure(
-                "language_detection", 
-                "Service de détection de langue indisponible",
-                stage_result
+    if has_audio:
+        # Mettre à jour l'étape actuelle
+        try:
+            await mongodb_connector.update_processing_stage(
+                video_id, "language_detection", stages_completed, stages_failed
             )
+        except Exception as e:
+            print(f"Erreur update stage: {e}")
         
-        # Lancer la détection
-        lang_result = await language_detection_client.detect_language_from_local_file(
-            video_path=video_path_for_processing,
-            duration=language_detection_duration,
-            test_all_languages=True
+        stage_start = datetime.now()
+        stage_result = ProcessingStageResult(
+            stage=ProcessingStage.LANGUAGE_DETECTION,
+            status=ProcessingStatus.PROCESSING,
+            started_at=stage_start
         )
         
-        stage_end = datetime.now()
-        stage_result.completed_at = stage_end
-        stage_result.duration = (stage_end - stage_start).total_seconds()
+        try:
+            # Vérifier le service
+            service_healthy = await language_detection_client.check_service_health()
+            if not service_healthy:
+                result.language_detection = stage_result
+                return await handle_pipeline_failure(
+                    "language_detection", 
+                    "Service de détection de langue indisponible",
+                    stage_result
+                )
+            
+            # Lancer la détection
+            lang_result = await language_detection_client.detect_language_from_local_file(
+                video_path=video_path_for_processing,
+                duration=language_detection_duration,
+                test_all_languages=True
+            )
+            
+            stage_end = datetime.now()
+            stage_result.completed_at = stage_end
+            stage_result.duration = (stage_end - stage_start).total_seconds()
+            
+            if lang_result.get("status") == "failed":
+                result.language_detection = stage_result
+                return await handle_pipeline_failure(
+                    "language_detection",
+                    lang_result.get("error", "Erreur inconnue lors de la détection de langue"),
+                    stage_result
+                )
+            
+            # Succès
+            stage_result.status = ProcessingStatus.COMPLETED
+            stage_result.result = {
+                "detected_language": lang_result.get("detected_language"),
+                "language_name": lang_result.get("language_name"),
+                "confidence": lang_result.get("confidence")
+            }
+            result.success_count += 1
+            stages_completed.append("language_detection")
+            
+            # Sauvegarder dans MongoDB
+            try:
+                await mongodb_connector.save_processing_result(
+                    video_id=video_id,
+                    processing_type=ProcessingType.LANGUAGE_DETECTION.value,
+                    result=stage_result.result
+                )
+            except Exception as e:
+                print(f"Erreur sauvegarde MongoDB (language): {e}")
         
-        if lang_result.get("status") == "failed":
+        except Exception as e:
             result.language_detection = stage_result
             return await handle_pipeline_failure(
                 "language_detection",
-                lang_result.get("error", "Erreur inconnue lors de la détection de langue"),
+                str(e),
                 stage_result
             )
         
-        # Succès
-        stage_result.status = ProcessingStatus.COMPLETED
-        stage_result.result = {
-            "detected_language": lang_result.get("detected_language"),
-            "language_name": lang_result.get("language_name"),
-            "confidence": lang_result.get("confidence")
-        }
+        result.language_detection = stage_result
+    else:
+        # Pas d'audio : marquer l'étape comme sautée
+        print("⏭️ Étape 1 (détection de langue) sautée : vidéo sans piste audio")
+        stage_result = ProcessingStageResult(
+            stage=ProcessingStage.LANGUAGE_DETECTION,
+            status=ProcessingStatus.COMPLETED,
+            started_at=datetime.now(),
+            completed_at=datetime.now(),
+            duration=0.0,
+            result={
+                "skipped": True,
+                "reason": "no_audio_track",
+                "detected_language": None,
+                "language_name": "Non applicable (pas d'audio)",
+                "confidence": 0.0
+            }
+        )
+        result.language_detection = stage_result
         result.success_count += 1
         stages_completed.append("language_detection")
-        
-        # Sauvegarder dans MongoDB
-        try:
-            await mongodb_connector.save_processing_result(
-                video_id=video_id,
-                processing_type=ProcessingType.LANGUAGE_DETECTION.value,
-                result=stage_result.result
-            )
-        except Exception as e:
-            print(f"Erreur sauvegarde MongoDB (language): {e}")
-    
-    except Exception as e:
-        result.language_detection = stage_result
-        return await handle_pipeline_failure(
-            "language_detection",
-            str(e),
-            stage_result
-        )
-    
-    result.language_detection = stage_result
     
     # ============================================================
     # ÉTAPE 2: COMPRESSION VIDÉO (OBLIGATOIRE)
@@ -1204,109 +1234,134 @@ async def process_video_global(
     result.compression = stage_result
     
     # ============================================================
-    # ÉTAPE 3: GÉNÉRATION DE SOUS-TITRES (OBLIGATOIRE)
+    # ÉTAPE 3: GÉNÉRATION DE SOUS-TITRES (SAUTÉE SI PAS D'AUDIO)
     # ============================================================
-    # Mettre à jour l'étape actuelle
-    try:
-        await mongodb_connector.update_processing_stage(
-            video_id, "subtitle_generation", stages_completed, stages_failed
-        )
-    except Exception as e:
-        print(f"Erreur update stage: {e}")
-    
-    stage_start = datetime.now()
-    stage_result = ProcessingStageResult(
-        stage=ProcessingStage.SUBTITLE_GENERATION,
-        status=ProcessingStatus.PROCESSING,
-        started_at=stage_start
-    )
-    
-    try:
-        # Vérifier le service
-        service_healthy = await subtitle_client.check_service_health()
-        if not service_healthy:
-            result.subtitle_generation = stage_result
-            return await handle_pipeline_failure(
-                "subtitle_generation",
-                "Service de sous-titres indisponible",
-                stage_result
-            )
-        
-        # Utiliser la langue détectée si disponible
-        lang_to_use = subtitle_language
-        if subtitle_language == "auto" and result.language_detection and result.language_detection.result:
-            detected = result.language_detection.result.get("detected_language")
-            if detected:
-                lang_to_use = detected
-        
-        # Normaliser la langue avant de l'envoyer au microservice
-        # Convertit "Espagnol" -> "es", "auto" -> None, etc.
+    if has_audio:
+        # Mettre à jour l'étape actuelle
         try:
-            lang_to_use = normalize_language_code(lang_to_use)
-        except ValueError as e:
-            result.subtitle_generation = stage_result
-            return await handle_pipeline_failure(
-                "subtitle_generation",
-                f"Langue invalide : {str(e)}",
-                stage_result
-            )
-        
-        # Lancer la génération
-        sub_result = await subtitle_client.generate_subtitles(
-            video_path=video_path_for_processing,
-            model_name=subtitle_model,
-            language=lang_to_use
-        )
-        
-        stage_end = datetime.now()
-        stage_result.completed_at = stage_end
-        stage_result.duration = (stage_end - stage_start).total_seconds()
-        
-        if sub_result.get("status") == "failed":
-            result.subtitle_generation = stage_result
-            return await handle_pipeline_failure(
-                "subtitle_generation",
-                sub_result.get("error", "Erreur inconnue lors de la génération des sous-titres"),
-                stage_result
-            )
-        
-        # Succès
-        stage_result.status = ProcessingStatus.COMPLETED
-        
-        # Extraire le texte complet depuis la clé "full_text"
-        subtitle_text_full = sub_result.get("full_text", "")
-        subtitle_text_preview = subtitle_text_full[:500] + "..." if len(subtitle_text_full) > 500 else subtitle_text_full
-        
-        stage_result.result = {
-            "model_name": subtitle_model,
-            "language": lang_to_use,
-            "subtitle_text": subtitle_text_full,  # Texte complet
-            "subtitle_text_preview": subtitle_text_preview,  # Preview pour l'API
-            "text_length": len(subtitle_text_full),  # Longueur du texte
-            "srt_url": sub_result.get("srt_url"),  # URL de téléchargement du fichier SRT
-        }
-        result.success_count += 1
-        stages_completed.append("subtitle_generation")
-        
-        # Sauvegarder dans MongoDB (avec texte complet)
-        try:
-            await mongodb_connector.save_processing_result(
-                video_id=video_id,
-                processing_type=ProcessingType.SUBTITLE_GENERATION.value,
-                result=stage_result.result
+            await mongodb_connector.update_processing_stage(
+                video_id, "subtitle_generation", stages_completed, stages_failed
             )
         except Exception as e:
-            print(f"Erreur sauvegarde MongoDB (subtitle): {e}")
-    
-    except Exception as e:
-        result.subtitle_generation = stage_result
-        return await handle_pipeline_failure(
-            "subtitle_generation",
-            str(e),
-            stage_result
+            print(f"Erreur update stage: {e}")
+        
+        stage_start = datetime.now()
+        stage_result = ProcessingStageResult(
+            stage=ProcessingStage.SUBTITLE_GENERATION,
+            status=ProcessingStatus.PROCESSING,
+            started_at=stage_start
         )
-    
-    result.subtitle_generation = stage_result
+        
+        try:
+            # Vérifier le service
+            service_healthy = await subtitle_client.check_service_health()
+            if not service_healthy:
+                result.subtitle_generation = stage_result
+                return await handle_pipeline_failure(
+                    "subtitle_generation",
+                    "Service de sous-titres indisponible",
+                    stage_result
+                )
+            
+            # Utiliser la langue détectée si disponible
+            lang_to_use = subtitle_language
+            if subtitle_language == "auto" and result.language_detection and result.language_detection.result:
+                detected = result.language_detection.result.get("detected_language")
+                if detected:
+                    lang_to_use = detected
+            
+            # Normaliser la langue avant de l'envoyer au microservice
+            # Convertit "Espagnol" -> "es", "auto" -> None, etc.
+            try:
+                lang_to_use = normalize_language_code(lang_to_use)
+            except ValueError as e:
+                result.subtitle_generation = stage_result
+                return await handle_pipeline_failure(
+                    "subtitle_generation",
+                    f"Langue invalide : {str(e)}",
+                    stage_result
+                )
+            
+            # Lancer la génération
+            sub_result = await subtitle_client.generate_subtitles(
+                video_path=video_path_for_processing,
+                model_name=subtitle_model,
+                language=lang_to_use
+            )
+            
+            stage_end = datetime.now()
+            stage_result.completed_at = stage_end
+            stage_result.duration = (stage_end - stage_start).total_seconds()
+            
+            if sub_result.get("status") == "failed":
+                result.subtitle_generation = stage_result
+                return await handle_pipeline_failure(
+                    "subtitle_generation",
+                    sub_result.get("error", "Erreur inconnue lors de la génération des sous-titres"),
+                    stage_result
+                )
+            
+            # Succès
+            stage_result.status = ProcessingStatus.COMPLETED
+            
+            # Extraire le texte complet depuis la clé "full_text"
+            subtitle_text_full = sub_result.get("full_text", "")
+            subtitle_text_preview = subtitle_text_full[:500] + "..." if len(subtitle_text_full) > 500 else subtitle_text_full
+            
+            stage_result.result = {
+                "model_name": subtitle_model,
+                "language": lang_to_use,
+                "subtitle_text": subtitle_text_full,  # Texte complet
+                "subtitle_text_preview": subtitle_text_preview,  # Preview pour l'API
+                "text_length": len(subtitle_text_full),  # Longueur du texte
+                "srt_url": sub_result.get("srt_url"),  # URL de téléchargement du fichier SRT
+            }
+            result.success_count += 1
+            stages_completed.append("subtitle_generation")
+            
+            # Sauvegarder dans MongoDB (avec texte complet)
+            try:
+                await mongodb_connector.save_processing_result(
+                    video_id=video_id,
+                    processing_type=ProcessingType.SUBTITLE_GENERATION.value,
+                    result=stage_result.result
+                )
+            except Exception as e:
+                print(f"Erreur sauvegarde MongoDB (subtitle): {e}")
+        
+        except Exception as e:
+            result.subtitle_generation = stage_result
+            return await handle_pipeline_failure(
+                "subtitle_generation",
+                str(e),
+                stage_result
+            )
+        
+        result.subtitle_generation = stage_result
+    else:
+        # Pas d'audio : marquer l'étape comme sautée avec un SRT vide
+        print("⏭️ Étape 3 (génération de sous-titres) sautée : vidéo sans piste audio")
+        stage_result = ProcessingStageResult(
+            stage=ProcessingStage.SUBTITLE_GENERATION,
+            status=ProcessingStatus.COMPLETED,
+            started_at=datetime.now(),
+            completed_at=datetime.now(),
+            duration=0.0,
+            result={
+                "skipped": True,
+                "reason": "no_audio_track",
+                "model_name": None,
+                "language": None,
+                "subtitle_text": "",
+                "subtitle_text_preview": "(Pas de sous-titres - vidéo sans audio)",
+                "text_length": 0,
+                "srt_url": None,  # Pas de SRT disponible
+                "srt_content": create_empty_srt_content()  # Contenu SRT vide pour l'agrégation
+            }
+        )
+        result.subtitle_generation = stage_result
+        result.success_count += 1
+        stages_completed.append("subtitle_generation")
     
     # ============================================================
     # ÉTAPE 4: DÉTECTION D'ANIMAUX (OBLIGATOIRE)
@@ -1390,6 +1445,128 @@ async def process_video_global(
     result.animal_detection = stage_result
     
     # ============================================================
+    # ÉTAPE 5: AGRÉGATION VIDÉO (AVEC OU SANS SOUS-TITRES)
+    # ============================================================
+    # Envoie la vidéo compressée et les sous-titres au service d'agrégation
+    # pour produire une vidéo finale avec sous-titres incrustés (si audio disponible)
+    # ou sans sous-titres (si pas d'audio)
+    
+    # Mettre à jour l'étape actuelle
+    try:
+        await mongodb_connector.update_processing_stage(
+            video_id, "aggregation", stages_completed, stages_failed
+        )
+    except Exception as e:
+        print(f"Erreur update stage: {e}")
+    
+    stage_start = datetime.now()
+    stage_result = ProcessingStageResult(
+        stage=ProcessingStage.AGGREGATION,
+        status=ProcessingStatus.PROCESSING,
+        started_at=stage_start
+    )
+    
+    try:
+        # Vérifier le service
+        service_healthy = await aggregation_client.check_service_health()
+        if not service_healthy:
+            result.aggregation = stage_result
+            return await handle_pipeline_failure(
+                "aggregation",
+                "Service d'agrégation indisponible",
+                stage_result
+            )
+        
+        # Récupérer l'URL SRT ou le contenu SRT depuis l'étape de génération de sous-titres
+        srt_url = None
+        srt_content = None
+        video_has_subtitles = has_audio  # Si pas d'audio, pas de vrais sous-titres
+        
+        if result.subtitle_generation and result.subtitle_generation.result:
+            srt_url = result.subtitle_generation.result.get("srt_url")
+            srt_content = result.subtitle_generation.result.get("srt_content")
+        
+        # Récupérer le chemin de la vidéo compressée depuis l'étape de compression
+        compressed_video_path = video_path_for_processing  # Par défaut, utiliser la vidéo originale
+        if result.compression and result.compression.result:
+            output_path = result.compression.result.get("output_path")
+            if output_path and Path(output_path).exists():
+                compressed_video_path = output_path
+        
+        # Lancer l'agrégation selon le mode (avec URL SRT ou contenu SRT direct)
+        if srt_url:
+            # Mode normal : télécharger le SRT depuis l'URL
+            print(f"🎬 Agrégation avec sous-titres depuis URL: {srt_url}")
+            agg_result = await aggregation_client.process_video_with_subtitles(
+                video_path=compressed_video_path,
+                srt_url=srt_url,
+                resolution=target_resolution,
+                crf_value=crf,
+                source_video_id=video_id  # Pass the source video ID for cross-database reference
+            )
+        else:
+            # Mode sans audio : utiliser un SRT vide
+            print("🎬 Agrégation sans sous-titres (vidéo sans piste audio)")
+            # Utiliser le contenu SRT vide ou en créer un
+            empty_srt = srt_content if srt_content else create_empty_srt_content()
+            agg_result = await aggregation_client.process_video_with_srt_content(
+                video_path=compressed_video_path,
+                srt_content=empty_srt,
+                resolution=target_resolution,
+                crf_value=crf,
+                source_video_id=video_id  # Pass the source video ID for cross-database reference
+            )
+        
+        stage_end = datetime.now()
+        stage_result.completed_at = stage_end
+        stage_result.duration = (stage_end - stage_start).total_seconds()
+        
+        if agg_result.get("status") == "failed":
+            result.aggregation = stage_result
+            return await handle_pipeline_failure(
+                "aggregation",
+                agg_result.get("error", "Erreur inconnue lors de l'agrégation"),
+                stage_result
+            )
+        
+        # Succès
+        stage_result.status = ProcessingStatus.COMPLETED
+        stage_result.result = {
+            "job_id": agg_result.get("job_id"),
+            "aggregated_video_id": agg_result.get("video_id"),
+            "streaming_url": agg_result.get("streaming_url"),
+            "metadata": agg_result.get("metadata", {}),
+            "message": agg_result.get("message"),
+            "has_subtitles": video_has_subtitles,  # Indique si la vidéo a des sous-titres incrustés
+            "no_audio": not has_audio  # Indique si la vidéo n'avait pas de piste audio
+        }
+        result.success_count += 1
+        stages_completed.append("aggregation")
+        
+        # Stocker l'URL de streaming finale
+        result.final_streaming_url = agg_result.get("streaming_url")
+        
+        # Sauvegarder dans MongoDB
+        try:
+            await mongodb_connector.save_processing_result(
+                video_id=video_id,
+                processing_type=ProcessingType.AGGREGATION.value,
+                result=stage_result.result
+            )
+        except Exception as e:
+            print(f"Erreur sauvegarde MongoDB (aggregation): {e}")
+    
+    except Exception as e:
+        result.aggregation = stage_result
+        return await handle_pipeline_failure(
+            "aggregation",
+            str(e),
+            stage_result
+        )
+    
+    result.aggregation = stage_result
+    
+    # ============================================================
     # FINALISATION - SUCCÈS COMPLET
     # ============================================================
     
@@ -1409,9 +1586,9 @@ async def process_video_global(
     result.completed_at = end_time
     result.total_duration = (end_time - start_time).total_seconds()
     
-    # Toutes les 4 étapes ont réussi (sinon on aurait déjà retourné avec un échec)
+    # Toutes les 5 étapes ont réussi (sinon on aurait déjà retourné avec un échec)
     result.overall_status = ProcessingStatus.COMPLETED
-    result.message = f"✅ Pipeline complet réussi ! (4/4 étapes en {result.total_duration:.1f}s)"
+    result.message = f"✅ Pipeline complet réussi ! (5/5 étapes en {result.total_duration:.1f}s)"
     
     # ============================================================
     # METTRE À JOUR LE STATUT FINAL DANS MONGODB
@@ -1468,8 +1645,13 @@ async def get_global_processing_result(video_id: str):
             processing_type="animal_detection"
         )
         
+        agg_result = await mongodb_connector.get_processing_result(
+            video_id=video_id,
+            processing_type="aggregation"
+        )
+        
         # Vérifier qu'au moins un résultat existe
-        if not any([lang_result, comp_result, sub_result, animal_result]):
+        if not any([lang_result, comp_result, sub_result, animal_result, agg_result]):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Aucun résultat de traitement pour la vidéo {video_id}"
@@ -1515,6 +1697,16 @@ async def get_global_processing_result(video_id: str):
                 result=animal_result
             )
             result.success_count += 1
+        
+        if agg_result:
+            result.aggregation = ProcessingStageResult(
+                stage=ProcessingStage.AGGREGATION,
+                status=ProcessingStatus.COMPLETED,
+                result=agg_result
+            )
+            result.success_count += 1
+            # Extraire l'URL de streaming finale
+            result.final_streaming_url = agg_result.get("streaming_url")
         
         return result
         

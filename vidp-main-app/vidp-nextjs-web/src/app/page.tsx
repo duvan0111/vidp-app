@@ -7,6 +7,8 @@ const API_LIST_URL = 'http://localhost:8000/api/v1/videos/'
 const API_GLOBAL_PROCESSING_URL = 'http://localhost:8000/api/v1/processing/process-video'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const API_ANIMAL_DETECTION_URL = 'http://localhost:8000/api/v1/processing/animal-detection'
+// Service de visualisation/streaming (vidp-cloud-visualisation-app)
+const API_VISUALISATION_URL = 'http://100.48.20.184:8006'
 
 // Types d'upload
 type UploadState = 'IDLE' | 'SELECTED' | 'UPLOADING' | 'SUCCESS' | 'ERROR'
@@ -23,14 +25,24 @@ interface ProcessingStageResult {
   stage: string
   status: ProcessingStageStatus
   result?: {
+    // Champs communs pour étapes sautées
+    skipped?: boolean
+    reason?: string
+    // Détection de langue
     detected_language?: string
     language_name?: string
     confidence?: number
+    // Compression
     resolution?: string
     output_path?: string
+    // Sous-titres
     model_name?: string
     language?: string
     subtitle_text?: string
+    subtitle_text_preview?: string
+    text_length?: number
+    srt_url?: string
+    srt_content?: string
     // Animal detection results
     video_info?: {
       duration_seconds: number
@@ -44,6 +56,19 @@ interface ProcessingStageResult {
       unique_classes: number
       animals_detected: Record<string, number>
       frames_with_detections: number
+    }
+    // Aggregation results
+    job_id?: string
+    aggregated_video_id?: string
+    streaming_url?: string
+    has_subtitles?: boolean
+    no_audio?: boolean
+    metadata?: {
+      original_filename?: string
+      final_filename?: string
+      resolution?: string
+      duration?: number
+      file_size?: number
     }
   }
   error_message?: string
@@ -62,6 +87,8 @@ interface GlobalProcessingResponse {
   compression?: ProcessingStageResult
   subtitle_generation?: ProcessingStageResult
   animal_detection?: ProcessingStageResult
+  aggregation?: ProcessingStageResult
+  final_streaming_url?: string
 }
 
 interface VideoMetadata {
@@ -79,6 +106,8 @@ interface VideoMetadata {
   current_stage?: string
   stages_completed?: string[]
   stages_failed?: string[]
+  // ID de la vidéo agrégée (pour le streaming via vidp-cloud-visualisation-app)
+  aggregated_video_id?: string
 }
 
 // Composant VideoUploader avec traitement global OBLIGATOIRE
@@ -670,32 +699,47 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
             {/* Détection de langue */}
             {globalResponse.language_detection && (
               <div className={`p-4 rounded-lg border ${
+                globalResponse.language_detection.result?.skipped ? 'border-yellow-600 bg-yellow-900/10' :
                 globalResponse.language_detection.status === 'completed' ? 'border-green-600 bg-green-900/10' :
                 globalResponse.language_detection.status === 'failed' ? 'border-red-600 bg-red-900/10' :
                 'border-gray-600 bg-gray-800/30'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={getStageStatus(globalResponse.language_detection.status).color}>
-                      {getStageStatus(globalResponse.language_detection.status).icon}
+                    <span className={globalResponse.language_detection.result?.skipped ? 'text-yellow-400' : getStageStatus(globalResponse.language_detection.status).color}>
+                      {globalResponse.language_detection.result?.skipped ? '⏭️' : getStageStatus(globalResponse.language_detection.status).icon}
                     </span>
                     <span className="font-medium text-white">🌍 Détection de langue</span>
+                    {globalResponse.language_detection.result?.skipped && (
+                      <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">Sautée</span>
+                    )}
                   </div>
-                  {globalResponse.language_detection.duration && (
+                  {globalResponse.language_detection.duration !== undefined && globalResponse.language_detection.duration > 0 && (
                     <span className="text-xs text-gray-500">{formatDuration(globalResponse.language_detection.duration)}</span>
                   )}
                 </div>
                 {globalResponse.language_detection.result && (
                   <div className="mt-2 pl-6 text-sm">
-                    <p className="text-gray-300">
-                      <span className="text-gray-500">Langue:</span>{' '}
-                      <span className="font-medium">{globalResponse.language_detection.result.language_name || globalResponse.language_detection.result.detected_language}</span>
-                    </p>
-                    {globalResponse.language_detection.result.confidence !== undefined && globalResponse.language_detection.result.confidence !== null && (
-                      <p className="text-gray-300">
-                        <span className="text-gray-500">Confiance:</span>{' '}
-                        <span className="font-medium">{(globalResponse.language_detection.result.confidence * 100).toFixed(1)}%</span>
+                    {globalResponse.language_detection.result.skipped ? (
+                      <p className="text-yellow-300">
+                        <span className="text-yellow-500">ℹ️</span>{' '}
+                        {globalResponse.language_detection.result.reason === 'no_audio_track' 
+                          ? 'Vidéo sans piste audio - détection de langue non applicable'
+                          : globalResponse.language_detection.result.language_name || 'Étape sautée'}
                       </p>
+                    ) : (
+                      <>
+                        <p className="text-gray-300">
+                          <span className="text-gray-500">Langue:</span>{' '}
+                          <span className="font-medium">{globalResponse.language_detection.result.language_name || globalResponse.language_detection.result.detected_language}</span>
+                        </p>
+                        {globalResponse.language_detection.result.confidence !== undefined && globalResponse.language_detection.result.confidence !== null && globalResponse.language_detection.result.confidence > 0 && (
+                          <p className="text-gray-300">
+                            <span className="text-gray-500">Confiance:</span>{' '}
+                            <span className="font-medium">{(globalResponse.language_detection.result.confidence * 100).toFixed(1)}%</span>
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -740,38 +784,53 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
             {/* Sous-titres */}
             {globalResponse.subtitle_generation && (
               <div className={`p-4 rounded-lg border ${
+                globalResponse.subtitle_generation.result?.skipped ? 'border-yellow-600 bg-yellow-900/10' :
                 globalResponse.subtitle_generation.status === 'completed' ? 'border-green-600 bg-green-900/10' :
                 globalResponse.subtitle_generation.status === 'failed' ? 'border-red-600 bg-red-900/10' :
                 'border-gray-600 bg-gray-800/30'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={getStageStatus(globalResponse.subtitle_generation.status).color}>
-                      {getStageStatus(globalResponse.subtitle_generation.status).icon}
+                    <span className={globalResponse.subtitle_generation.result?.skipped ? 'text-yellow-400' : getStageStatus(globalResponse.subtitle_generation.status).color}>
+                      {globalResponse.subtitle_generation.result?.skipped ? '⏭️' : getStageStatus(globalResponse.subtitle_generation.status).icon}
                     </span>
                     <span className="font-medium text-white">📝 Génération sous-titres</span>
+                    {globalResponse.subtitle_generation.result?.skipped && (
+                      <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">Sautée</span>
+                    )}
                   </div>
-                  {globalResponse.subtitle_generation.duration && (
+                  {globalResponse.subtitle_generation.duration !== undefined && globalResponse.subtitle_generation.duration > 0 && (
                     <span className="text-xs text-gray-500">{formatDuration(globalResponse.subtitle_generation.duration)}</span>
                   )}
                 </div>
                 {globalResponse.subtitle_generation.result && (
                   <div className="mt-2 pl-6 text-sm">
-                    <p className="text-gray-300">
-                      <span className="text-gray-500">Modèle:</span>{' '}
-                      <span className="font-medium">{globalResponse.subtitle_generation.result.model_name}</span>
-                    </p>
-                    <p className="text-gray-300">
-                      <span className="text-gray-500">Langue:</span>{' '}
-                      <span className="font-medium">{globalResponse.subtitle_generation.result.language}</span>
-                    </p>
-                    {globalResponse.subtitle_generation.result.subtitle_text && (
-                      <div className="mt-2">
-                        <span className="text-gray-500">Aperçu:</span>
-                        <p className="mt-1 text-xs text-gray-400 bg-gray-800 p-2 rounded max-h-20 overflow-y-auto">
-                          {globalResponse.subtitle_generation.result.subtitle_text}
+                    {globalResponse.subtitle_generation.result.skipped ? (
+                      <p className="text-yellow-300">
+                        <span className="text-yellow-500">ℹ️</span>{' '}
+                        {globalResponse.subtitle_generation.result.reason === 'no_audio_track' 
+                          ? 'Vidéo sans piste audio - génération de sous-titres non applicable'
+                          : globalResponse.subtitle_generation.result.subtitle_text_preview || 'Étape sautée'}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-gray-300">
+                          <span className="text-gray-500">Modèle:</span>{' '}
+                          <span className="font-medium">{globalResponse.subtitle_generation.result.model_name}</span>
                         </p>
-                      </div>
+                        <p className="text-gray-300">
+                          <span className="text-gray-500">Langue:</span>{' '}
+                          <span className="font-medium">{globalResponse.subtitle_generation.result.language}</span>
+                        </p>
+                        {globalResponse.subtitle_generation.result.subtitle_text && (
+                          <div className="mt-2">
+                            <span className="text-gray-500">Aperçu:</span>
+                            <p className="mt-1 text-xs text-gray-400 bg-gray-800 p-2 rounded max-h-20 overflow-y-auto">
+                              {globalResponse.subtitle_generation.result.subtitle_text}
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -835,6 +894,100 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
                 )}
               </div>
             )}
+
+            {/* Agrégation */}
+            {globalResponse.aggregation && (
+              <div className={`p-4 rounded-lg border ${
+                globalResponse.aggregation.status === 'completed' ? 'border-green-600 bg-green-900/10' :
+                globalResponse.aggregation.status === 'failed' ? 'border-red-600 bg-red-900/10' :
+                'border-gray-600 bg-gray-800/30'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={getStageStatus(globalResponse.aggregation.status).color}>
+                      {getStageStatus(globalResponse.aggregation.status).icon}
+                    </span>
+                    <span className="font-medium text-white">🎬 Agrégation vidéo</span>
+                    {globalResponse.aggregation.result?.no_audio && (
+                      <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">Sans sous-titres</span>
+                    )}
+                  </div>
+                  {globalResponse.aggregation.duration && (
+                    <span className="text-xs text-gray-500">{formatDuration(globalResponse.aggregation.duration)}</span>
+                  )}
+                </div>
+                {globalResponse.aggregation.result && (
+                  <div className="mt-2 pl-6 text-sm">
+                    {globalResponse.aggregation.result.no_audio && (
+                      <p className="text-yellow-300 mb-2">
+                        <span className="text-yellow-500">ℹ️</span>{' '}
+                        Vidéo traitée sans sous-titres (pas de piste audio détectée)
+                      </p>
+                    )}
+                    {globalResponse.aggregation.result.streaming_url && (
+                      <p className="text-gray-300">
+                        <span className="text-gray-500">Vidéo finale:</span>{' '}
+                        <a 
+                          href={globalResponse.aggregation.result.streaming_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 underline"
+                        >
+                          🎥 {globalResponse.aggregation.result.has_subtitles ? 'Voir la vidéo avec sous-titres' : 'Voir la vidéo'}
+                        </a>
+                      </p>
+                    )}
+                    {globalResponse.aggregation.result.metadata && (
+                      <div className="mt-2 space-y-1">
+                        {globalResponse.aggregation.result.metadata.resolution && (
+                          <p className="text-gray-300">
+                            <span className="text-gray-500">Résolution:</span>{' '}
+                            <span className="font-medium">{globalResponse.aggregation.result.metadata.resolution}</span>
+                          </p>
+                        )}
+                        {globalResponse.aggregation.result.metadata.duration && (
+                          <p className="text-gray-300">
+                            <span className="text-gray-500">Durée:</span>{' '}
+                            <span className="font-medium">{formatDuration(globalResponse.aggregation.result.metadata.duration)}</span>
+                          </p>
+                        )}
+                        {globalResponse.aggregation.result.metadata.file_size && (
+                          <p className="text-gray-300">
+                            <span className="text-gray-500">Taille:</span>{' '}
+                            <span className="font-medium">{formatFileSize(globalResponse.aggregation.result.metadata.file_size)}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {globalResponse.aggregation.error_message && (
+                  <p className="mt-2 pl-6 text-sm text-red-400">{globalResponse.aggregation.error_message}</p>
+                )}
+              </div>
+            )}
+
+            {/* Lien vers la vidéo finale */}
+            {globalResponse.final_streaming_url && (
+              <div className="p-4 rounded-lg border border-blue-500 bg-blue-900/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🎉</span>
+                    <span className="font-medium text-white">Vidéo finale prête !</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-3">
+                  <a 
+                    href={globalResponse.final_streaming_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg text-center transition-all duration-200"
+                  >
+                    ▶️ {globalResponse.aggregation?.result?.has_subtitles !== false ? 'Regarder la vidéo avec sous-titres' : 'Regarder la vidéo'}
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Statistiques */}
@@ -861,6 +1014,34 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
 // Composant VideoList - Affiche les vidéos traitées
 function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: () => void }) {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null)
+  const [streamingUrls, setStreamingUrls] = useState<Record<string, string>>({})
+
+  // Récupérer l'URL de streaming depuis le service de visualisation
+  const getStreamingUrl = async (sourceVideoId: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${API_VISUALISATION_URL}/api/videos/by-source/${sourceVideoId}`)
+      if (response.ok) {
+        const data = await response.json()
+        // Construire l'URL de streaming avec l'ID de la vidéo agrégée
+        return `${API_VISUALISATION_URL}${data.streaming_url}`
+      }
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de l'URL de streaming pour ${sourceVideoId}:`, error)
+    }
+    return null
+  }
+
+  // Charger l'URL de streaming quand une vidéo est sélectionnée
+  useEffect(() => {
+    if (selectedVideo && !streamingUrls[selectedVideo]) {
+      getStreamingUrl(selectedVideo).then(url => {
+        if (url) {
+          setStreamingUrls(prev => ({ ...prev, [selectedVideo]: url }))
+        }
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVideo])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -970,13 +1151,22 @@ function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: 
 
               {selectedVideo === video.video_id && (
                 <div className="mt-4 pt-4 border-t border-gray-700">
-                  <video
-                    controls
-                    className="w-full rounded-lg bg-black"
-                    src={`http://localhost:8000/api/v1/videos/stream/${video.video_id}`}
-                  >
-                    Votre navigateur ne supporte pas la lecture vidéo.
-                  </video>
+                  {streamingUrls[video.video_id] ? (
+                    <video
+                      controls
+                      className="w-full rounded-lg bg-black"
+                      src={streamingUrls[video.video_id]}
+                    >
+                      Votre navigateur ne supporte pas la lecture vidéo.
+                    </video>
+                  ) : (
+                    <div className="w-full aspect-video bg-black rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                        <p className="text-gray-400 text-sm">Chargement du flux vidéo...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -998,7 +1188,8 @@ function ProcessingVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRe
     { id: 'language_detection', icon: '🌍', label: 'Détection langue' },
     { id: 'compression', icon: '📐', label: 'Compression' },
     { id: 'subtitle_generation', icon: '📝', label: 'Sous-titres' },
-    { id: 'animal_detection', icon: '🐾', label: 'Animaux' }
+    { id: 'animal_detection', icon: '🐾', label: 'Animaux' },
+    { id: 'aggregation', icon: '🎬', label: 'Agrégation' }
   ]
 
   // Obtenir le statut d'une étape pour une vidéo
@@ -1013,7 +1204,7 @@ function ProcessingVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRe
   const getProgress = (video: VideoMetadata): number => {
     const completed = video.stages_completed?.length || 0
     const failed = video.stages_failed?.length || 0
-    const total = 4 // 4 étapes possibles maintenant
+    const total = 5 // 5 étapes possibles maintenant
     return Math.round(((completed + failed) / total) * 100)
   }
 

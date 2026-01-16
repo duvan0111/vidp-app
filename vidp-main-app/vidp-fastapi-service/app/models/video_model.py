@@ -21,6 +21,7 @@ class ProcessingType(str, Enum):
     COMPRESSION = "compression"
     SUBTITLE_GENERATION = "subtitle_generation"
     ANIMAL_DETECTION = "animal_detection"
+    AGGREGATION = "aggregation"
 
 
 class ProcessingStatus(str, Enum):
@@ -38,6 +39,7 @@ class ProcessingStage(str, Enum):
     COMPRESSION = "compression"
     SUBTITLE_GENERATION = "subtitle_generation"
     ANIMAL_DETECTION = "animal_detection"
+    AGGREGATION = "aggregation"
 
 
 class VideoUploadResponse(BaseModel):
@@ -217,12 +219,16 @@ class GlobalProcessingResult(BaseModel):
     compression: Optional[ProcessingStageResult] = None
     subtitle_generation: Optional[ProcessingStageResult] = None
     animal_detection: Optional[ProcessingStageResult] = None
+    aggregation: Optional[ProcessingStageResult] = None
     
     # Résumé
     success_count: int = 0
     failure_count: int = 0
     skipped_count: int = 0
     message: str = ""
+    
+    # URL de streaming de la vidéo finale (après agrégation)
+    final_streaming_url: Optional[str] = None
 
 
 class AnimalDetectionRequest(BaseModel):

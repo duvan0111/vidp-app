@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
+// Service de visualisation/streaming (vidp-cloud-visualisation-app)
+const API_VISUALISATION_URL = 'http://100.48.20.184:8006'
+
 // Types
 interface VideoMetadata {
   video_id: string
@@ -18,13 +21,6 @@ interface VideoMetadata {
   current_stage?: string
   stages_completed?: string[]
   stages_failed?: string[]
-}
-
-interface ProcessingResult {
-  video_id: string
-  processing_type: string
-  result: any
-  created_at?: string
 }
 
 interface LanguageDetectionResult {
@@ -82,6 +78,21 @@ export default function VideoDetailPage() {
   const [animalResult, setAnimalResult] = useState<AnimalDetectionResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [streamingUrl, setStreamingUrl] = useState<string | null>(null)
+
+  // Récupérer l'URL de streaming depuis le service de visualisation
+  const fetchStreamingUrl = async (sourceVideoId: string) => {
+    try {
+      const response = await fetch(`${API_VISUALISATION_URL}/api/videos/by-source/${sourceVideoId}`)
+      if (response.ok) {
+        const data = await response.json()
+        // Construire l'URL de streaming complète
+        setStreamingUrl(`${API_VISUALISATION_URL}${data.streaming_url}`)
+      }
+    } catch (err) {
+      console.error('Erreur lors de la récupération de l\'URL de streaming:', err)
+    }
+  }
 
   // Fetch video metadata and processing results
   useEffect(() => {
@@ -100,6 +111,9 @@ export default function VideoDetailPage() {
 
         // Fetch processing results only if video is completed
         if (videoData.status === 'completed') {
+          // Récupérer l'URL de streaming depuis le service de visualisation
+          fetchStreamingUrl(videoId)
+
           // Language detection
           try {
             const langResponse = await fetch(`http://localhost:8000/api/v1/processing/language-detection/${videoId}`)
@@ -107,7 +121,7 @@ export default function VideoDetailPage() {
               const langData = await langResponse.json()
               setLanguageResult(langData)
             }
-          } catch (err) {
+          } catch {
             console.log('Language detection result not available')
           }
 
@@ -118,7 +132,7 @@ export default function VideoDetailPage() {
               const compData = await compResponse.json()
               setCompressionResult(compData)
             }
-          } catch (err) {
+          } catch {
             console.log('Compression result not available')
           }
 
@@ -129,7 +143,7 @@ export default function VideoDetailPage() {
               const subData = await subResponse.json()
               setSubtitleResult(subData)
             }
-          } catch (err) {
+          } catch {
             console.log('Subtitle result not available')
           }
 
@@ -140,7 +154,7 @@ export default function VideoDetailPage() {
               const animalData = await animalResponse.json()
               setAnimalResult(animalData.result)
             }
-          } catch (err) {
+          } catch {
             console.log('Animal detection result not available')
           }
         }
@@ -223,7 +237,7 @@ export default function VideoDetailPage() {
             onClick={() => router.push('/')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
           >
-            ← Retour à l'accueil
+            ← Retour à l&apos;accueil
           </button>
         </div>
       </div>
@@ -279,14 +293,21 @@ export default function VideoDetailPage() {
               {/* Video Player */}
               <div className="w-full aspect-video bg-black rounded-lg overflow-hidden shadow-2xl mb-6">
                 {video.status === 'completed' ? (
-                  <video
-                    controls
-                    autoPlay
-                    className="w-full h-full"
-                    src={`http://localhost:8000/api/v1/videos/stream/${videoId}`}
-                  >
-                    Votre navigateur ne supporte pas la lecture vidéo.
-                  </video>
+                  streamingUrl ? (
+                    <video
+                      controls
+                      autoPlay
+                      className="w-full h-full"
+                      src={streamingUrl}
+                    >
+                      Votre navigateur ne supporte pas la lecture vidéo.
+                    </video>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                      <p className="text-sm">Chargement du flux vidéo...</p>
+                    </div>
+                  )
                 ) : video.status === 'processing' ? (
                   <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
                     <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-red-500 mb-4"></div>
@@ -347,7 +368,7 @@ export default function VideoDetailPage() {
               {video.status === 'completed' ? (
                 <div className="space-y-3">
                   {/* Pod 1: Language Detection */}
-                  <PodStatusCard name="Language Detection Pod" icon="🗣" color="#3498db">
+                  <PodStatusCard name="LANGUE" icon="🗣" color="#3498db">
                     {languageResult ? (
                       <div className="text-sm">
                         <p className="text-white font-semibold">
@@ -478,43 +499,6 @@ export default function VideoDetailPage() {
                 </div>
               )}
 
-              {/* Processing Timeline */}
-              {video.stages_completed && video.stages_completed.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <h4 className="text-sm font-semibold text-gray-400 mb-3">PROGRESSION DU PIPELINE</h4>
-                  <div className="space-y-2">
-                    {['language_detection', 'compression', 'subtitle_generation', 'animal_detection'].map((stage) => {
-                      const isCompleted = video.stages_completed?.includes(stage)
-                      const isFailed = video.stages_failed?.includes(stage)
-                      const isCurrent = video.current_stage === stage
-                      
-                      const stageLabels: Record<string, string> = {
-                        language_detection: '🌍 Détection langue',
-                        compression: '📐 Compression',
-                        subtitle_generation: '📝 Sous-titres',
-                        animal_detection: '🐾 Détection animaux'
-                      }
-                      
-                      return (
-                        <div 
-                          key={stage}
-                          className={`flex items-center gap-2 text-sm ${
-                            isCompleted ? 'text-green-400' :
-                            isFailed ? 'text-red-400' :
-                            isCurrent ? 'text-yellow-400' :
-                            'text-gray-600'
-                          }`}
-                        >
-                          <span>
-                            {isCompleted ? '✓' : isFailed ? '✗' : isCurrent ? '⏳' : '○'}
-                          </span>
-                          <span>{stageLabels[stage]}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
