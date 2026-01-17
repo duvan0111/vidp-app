@@ -8,7 +8,7 @@ data:
   LANGSCALE_SERVICE_URL: "http://langscale-service:8002"
   DOWNSCALE_SERVICE_URL: "http://downscale-service:8001"
   SUBTITLE_SERVICE_URL: "http://subtitle-service:8003"
-  ANIMAL_DETECT_SERVICE_URL: "http://animal-detect-service:8004"
+  ANIMAL_DETECTION_SERVICE_URL: "http://animal-detect-service:8004"
   
   # Main app config
   APP_NAME: "VidP Kubernetes API"

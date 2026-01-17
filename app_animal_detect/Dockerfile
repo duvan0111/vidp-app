@@ -17,6 +17,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy YOLO model (cached layer if model doesn't change)
+COPY yolov8n.pt /app/yolov8n.pt
+
 # Copy application code
 COPY . .
 

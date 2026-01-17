@@ -15,16 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create necessary directories
+# Create necessary directories structure
 # Note: uploads/ and downloads/ are for temporary files only (auto-cleaned)
 # Only compressed/ videos are persisted
+# The app will create resolution subdirectories automatically via lifespan event
 RUN mkdir -p video_storage/uploads \
     video_storage/downloads \
-    video_storage/compressed/240p \
-    video_storage/compressed/360p \
-    video_storage/compressed/480p \
-    video_storage/compressed/720p \
-    video_storage/compressed/1080p
+    video_storage/compressed
 
 # Expose port
 EXPOSE 8001

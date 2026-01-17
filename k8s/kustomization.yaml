@@ -13,7 +13,6 @@ resources:
   - downscale.yaml
   - subtitle.yaml
   - animal-detect.yaml
-  - aggregation.yaml
   - main-app.yaml
   - frontend.yaml
   - ingress.yaml

@@ -37,17 +37,6 @@ spec:
               value: "/app/local_storage"
             - name: LOCAL_VIDEO_PATH
               value: "/app/local_storage/videos"
-            # Microservices URLs (K8s internal DNS)
-            - name: LANGSCALE_SERVICE_URL
-              value: "http://langscale-service:8002"
-            - name: DOWNSCALE_SERVICE_URL
-              value: "http://downscale-service:8001"
-            - name: SUBTITLE_SERVICE_URL
-              value: "http://subtitle-service:8003"
-            - name: ANIMAL_DETECTION_SERVICE_URL
-              value: "http://animal-detect-service:8004"
-            - name: AGGREGATION_SERVICE_URL
-              value: "http://aggregation-service:8005"
             - name: MICROSERVICES_TIMEOUT
               value: "1800"
           resources:
