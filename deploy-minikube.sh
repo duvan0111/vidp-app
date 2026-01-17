@@ -164,11 +164,17 @@ deploy_k8s() {
     kubectl apply -f "${PROJECT_DIR}/k8s/subtitle.yaml"
     kubectl apply -f "${PROJECT_DIR}/k8s/animal-detect.yaml"
     
+    print_info "Attente que les microservices démarrent..."
+    sleep 10
+    
     print_info "Déploiement de l'application principale..."
     kubectl apply -f "${PROJECT_DIR}/k8s/main-app.yaml"
     
     print_info "Déploiement du frontend..."
     kubectl apply -f "${PROJECT_DIR}/k8s/frontend.yaml"
+    
+    print_info "Attente que les microservices soient prêts..."
+    sleep 5
     
     print_info "Configuration de l'Ingress..."
     kubectl apply -f "${PROJECT_DIR}/k8s/ingress.yaml"
@@ -177,6 +183,33 @@ deploy_k8s() {
     
     print_info "Attente que tous les pods soient prêts..."
     sleep 10
+    kubectl get pods -n ${NAMESPACE}
+    
+    echo ""
+    print_info "Pour accéder aux services:"
+    echo "  - Frontend: $(minikube service frontend-service -n ${NAMESPACE} --url 2>/dev/null || echo 'En attente...')"
+    echo "  - API: $(minikube service main-app-service -n ${NAMESPACE} --url 2>/dev/null || echo 'En attente...')"
+    echo ""
+    print_info "Ou utilisez: minikube tunnel (dans un terminal séparé)"
+}
+
+# Déployer avec Kustomize (recommandé)
+deploy_kustomize() {
+    print_header "Déploiement avec Kustomize"
+    
+    # S'assurer que le contexte est Minikube
+    kubectl config use-context minikube
+    
+    print_info "Application de la configuration Kustomize..."
+    kubectl apply -k "${PROJECT_DIR}/k8s/"
+    
+    print_success "Déploiement Kustomize terminé"
+    
+    print_info "Attente que MongoDB soit prêt..."
+    kubectl wait --for=condition=ready pod -l app=mongodb -n ${NAMESPACE} --timeout=120s || true
+    
+    print_info "Attente que tous les pods soient prêts..."
+    sleep 15
     kubectl get pods -n ${NAMESPACE}
     
     echo ""
@@ -258,28 +291,117 @@ port_forward() {
     wait
 }
 
+# Rebuild et redeploy un microservice spécifique
+rebuild_service() {
+    local service=$1
+    
+    if [ -z "$service" ]; then
+        print_error "Usage: $0 rebuild <service>"
+        print_info "Services disponibles: langscale, downscale, subtitle, animal-detect, main-app, frontend"
+        return 1
+    fi
+    
+    print_header "Rebuild de ${service}"
+    
+    # Configurer Docker pour Minikube
+    eval $(minikube docker-env)
+    
+    # Mapper les noms de services aux chemins
+    case "$service" in
+        langscale)
+            print_info "Rebuild de vidp/langscale..."
+            docker build -t vidp/langscale:latest "${PROJECT_DIR}/app_langscale"
+            ;;
+        downscale)
+            print_info "Rebuild de vidp/downscale..."
+            docker build -t vidp/downscale:latest "${PROJECT_DIR}/app_downscale"
+            ;;
+        subtitle)
+            print_info "Rebuild de vidp/subtitle..."
+            docker build -t vidp/subtitle:latest "${PROJECT_DIR}/app_subtitle"
+            ;;
+        animal-detect)
+            print_info "Rebuild de vidp/animal-detect..."
+            docker build -t vidp/animal-detect:latest "${PROJECT_DIR}/app_animal_detect"
+            ;;
+        main-app)
+            print_info "Rebuild de vidp/main-app..."
+            docker build -t vidp/main-app:latest "${PROJECT_DIR}/vidp-main-app/vidp-fastapi-service"
+            ;;
+        frontend)
+            print_info "Rebuild de vidp/frontend..."
+            docker build -t vidp/frontend:latest "${PROJECT_DIR}/vidp-main-app/vidp-nextjs-web"
+            ;;
+        *)
+            print_error "Service inconnu: ${service}"
+            return 1
+            ;;
+    esac
+    
+    # Restart le pod
+    print_info "Redémarrage du pod ${service}..."
+    kubectl delete pod -n ${NAMESPACE} -l app=${service}
+    
+    print_info "Attente du nouveau pod..."
+    kubectl wait --for=condition=ready pod -l app=${service} -n ${NAMESPACE} --timeout=60s || true
+    
+    print_success "Service ${service} mis à jour!"
+    
+    # Afficher les logs
+    print_info "Logs récents:"
+    kubectl logs -n ${NAMESPACE} -l app=${service} --tail=20
+}
+
+# Vérifier la santé de tous les services
+health_check() {
+    print_header "Vérification de la santé des services"
+    
+    print_info "Status des Pods:"
+    kubectl get pods -n ${NAMESPACE} -o wide
+    
+    echo ""
+    print_info "Status des Services:"
+    kubectl get services -n ${NAMESPACE}
+    
+    echo ""
+    print_info "Status des PVC:"
+    kubectl get pvc -n ${NAMESPACE}
+    
+    echo ""
+    print_info "Événements récents:"
+    kubectl get events -n ${NAMESPACE} --sort-by='.lastTimestamp' | tail -10
+}
+
 # Afficher l'aide
 show_help() {
     echo "Usage: $0 <commande> [options]"
     echo ""
     echo "Commandes disponibles:"
-    echo "  start       - Démarrer Minikube"
-    echo "  stop        - Arrêter Minikube"
-    echo "  status      - Afficher le statut"
-    echo "  build       - Construire les images Docker"
-    echo "  deploy      - Déployer sur Kubernetes"
-    echo "  delete      - Supprimer le déploiement"
-    echo "  logs <svc>  - Afficher les logs d'un service"
-    echo "  dashboard   - Ouvrir le dashboard Kubernetes"
-    echo "  urls        - Afficher les URLs des services"
-    echo "  forward     - Port-forward des services"
-    echo "  all         - start + build + deploy"
-    echo "  help        - Afficher cette aide"
+    echo "  start          - Démarrer Minikube"
+    echo "  stop           - Arrêter Minikube"
+    echo "  status         - Afficher le statut"
+    echo "  build          - Construire les images Docker"
+    echo "  deploy         - Déployer sur Kubernetes (manuel)"
+    echo "  kustomize      - Déployer avec Kustomize (recommandé)"
+    echo "  delete         - Supprimer le déploiement"
+    echo "  logs <svc>     - Afficher les logs d'un service"
+    echo "  rebuild <svc>  - Rebuild et redéployer un service"
+    echo "  health         - Vérifier la santé des services"
+    echo "  dashboard      - Ouvrir le dashboard Kubernetes"
+    echo "  urls           - Afficher les URLs des services"
+    echo "  forward        - Port-forward des services"
+    echo "  all            - start + build + deploy"
+    echo "  help           - Afficher cette aide"
+    echo ""
+    echo "Services disponibles pour logs/rebuild:"
+    echo "  - mongodb, langscale, downscale, subtitle, animal-detect, main-app, frontend"
     echo ""
     echo "Exemples:"
-    echo "  $0 all              # Démarrage complet"
-    echo "  $0 logs main-app    # Logs de l'API principale"
-    echo "  $0 forward          # Accès local via port-forward"
+    echo "  $0 all                    # Démarrage complet"
+    echo "  $0 rebuild main-app       # Rebuild uniquement main-app"
+    echo "  $0 logs main-app          # Logs de l'API principale"
+    echo "  $0 forward                # Accès local via port-forward"
+    echo "  $0 kustomize              # Déploiement avec Kustomize"
 }
 
 # Main
@@ -303,11 +425,20 @@ main() {
         deploy)
             deploy_k8s
             ;;
+        kustomize)
+            deploy_kustomize
+            ;;
         delete)
             delete_k8s
             ;;
         logs)
             show_logs "$2"
+            ;;
+        rebuild)
+            rebuild_service "$2"
+            ;;
+        health)
+            health_check
             ;;
         dashboard)
             open_dashboard
