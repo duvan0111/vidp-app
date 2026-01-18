@@ -1493,20 +1493,44 @@ async def process_video_global(
             if output_path and Path(output_path).exists():
                 compressed_video_path = output_path
         
+        # Récupérer la langue détectée
+        detected_language = None
+        if result.language_detection and result.language_detection.result:
+            detected_language = result.language_detection.result.get("detected_language")
+        
+        # Récupérer les animaux détectés
+        animals_detected = {}
+        if result.animal_detection and result.animal_detection.result:
+            detection_summary = result.animal_detection.result.get("detection_summary", {})
+            animals_detected = detection_summary.get("animals_detected", {})
+        
+        # Récupérer le nom original de la vidéo depuis MongoDB
+        original_filename = video_file.filename if 'video_file' in locals() else None
+        if not original_filename and video_metadata:
+            original_filename = video_metadata.original_filename
+        
         # Lancer l'agrégation selon le mode (avec URL SRT ou contenu SRT direct)
         if srt_url:
             # Mode normal : télécharger le SRT depuis l'URL
             print(f"🎬 Agrégation avec sous-titres depuis URL: {srt_url}")
+            print(f"   Nom original: {original_filename}")
+            print(f"   Langue détectée: {detected_language}")
+            print(f"   Animaux détectés: {animals_detected}")
             agg_result = await aggregation_client.process_video_with_subtitles(
                 video_path=compressed_video_path,
                 srt_url=srt_url,
                 resolution=target_resolution,
                 crf_value=crf,
-                source_video_id=video_id  # Pass the source video ID for cross-database reference
+                source_video_id=video_id,  # Pass the source video ID for cross-database reference
+                original_filename=original_filename,  # Envoyer le nom original de la vidéo
+                detected_language=detected_language,  # Envoyer la langue détectée
+                animals_detected=animals_detected  # Envoyer les animaux détectés
             )
         else:
             # Mode sans audio : utiliser un SRT vide
             print("🎬 Agrégation sans sous-titres (vidéo sans piste audio)")
+            print(f"   Nom original: {original_filename}")
+            print(f"   Animaux détectés: {animals_detected}")
             # Utiliser le contenu SRT vide ou en créer un
             empty_srt = srt_content if srt_content else create_empty_srt_content()
             agg_result = await aggregation_client.process_video_with_srt_content(
@@ -1514,7 +1538,10 @@ async def process_video_global(
                 srt_content=empty_srt,
                 resolution=target_resolution,
                 crf_value=crf,
-                source_video_id=video_id  # Pass the source video ID for cross-database reference
+                source_video_id=video_id,  # Pass the source video ID for cross-database reference
+                original_filename=original_filename,  # Envoyer le nom original de la vidéo
+                detected_language=detected_language,  # Envoyer la langue détectée
+                animals_detected=animals_detected  # Envoyer les animaux détectés
             )
         
         stage_end = datetime.now()

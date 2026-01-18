@@ -55,7 +55,10 @@ class AggregationClient:
         srt_url: str,
         resolution: str = "360p",
         crf_value: int = 23,
-        source_video_id: Optional[str] = None
+        source_video_id: Optional[str] = None,
+        detected_language: Optional[str] = None,
+        animals_detected: Optional[dict] = None,
+        original_filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Envoie une vidéo compressée et le fichier SRT au service d'agrégation pour incrustation des sous-titres.
@@ -120,6 +123,16 @@ class AggregationClient:
                     'resolution': resolution,
                     'crf_value': str(crf_value)
                 }
+
+                if original_filename:
+                    data['original_filename'] = original_filename
+
+                if detected_language:
+                    data['detected_language'] = detected_language
+                
+                if animals_detected:
+                    import json
+                    data['animals_detected'] = json.dumps(animals_detected)
                 
                 # Add source_video_id if provided (for cross-database reference)
                 if source_video_id:
@@ -188,7 +201,10 @@ class AggregationClient:
         srt_content: str,
         resolution: str = "360p",
         crf_value: int = 23,
-        source_video_id: Optional[str] = None
+        source_video_id: Optional[str] = None,
+        detected_language: Optional[str] = None,      # ⭐ NOUVEAU
+        animals_detected: Optional[dict] = None,
+        original_filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Envoie une vidéo avec un contenu SRT direct (sans téléchargement depuis URL).
@@ -235,6 +251,17 @@ class AggregationClient:
                     'resolution': resolution,
                     'crf_value': str(crf_value)
                 }
+
+                if original_filename:
+                    data['original_filename'] = original_filename
+
+
+                if detected_language:
+                    data['detected_language'] = detected_language
+                
+                if animals_detected:
+                    import json
+                    data['animals_detected'] = json.dumps(animals_detected)
                 
                 # Add source_video_id if provided (for cross-database reference)
                 if source_video_id:
