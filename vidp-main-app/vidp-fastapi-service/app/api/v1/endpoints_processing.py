@@ -755,7 +755,7 @@ async def get_compression_result(video_id: str):
             status=ProcessingStatus.COMPLETED,
             resolution=result.get("resolution"),
             original_size=metadata.get("original_size"),
-            compressed_size=metadata.get("compressed_size"),
+            compressed_size=metadata.get("final_size_mb"),
             compression_ratio=compression_ratio,
             output_path=result.get("output_path"),
             completed_at=result.get("completed_at")

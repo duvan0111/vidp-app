@@ -33,13 +33,11 @@ interface LanguageDetectionResult {
 interface CompressionResult {
   resolution?: string
   crf_value?: number
-  metadata?: {
-    original_size?: number
-    compressed_size?: number
-    compression_ratio?: string
-    duration?: number
-    bitrate?: number
-  }
+  original_size?: number
+  compressed_size?: number
+  compression_ratio?: string
+  duration?: number
+  bitrate?: number
   output_path?: string
 }
 
@@ -328,29 +326,35 @@ export default function VideoDetailPage() {
               <div>
                 <h2 className="text-2xl font-bold mb-2">{video.original_filename}</h2>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
+                  {/* <div>
                     <span className="text-gray-400">Taille:</span>
                     <span className="ml-2 text-white font-medium">{formatFileSize(video.file_size)}</span>
-                  </div>
-                  <div>
+                  </div> */}
+                  {/* <div>
                     <span className="text-gray-400">Format:</span>
                     <span className="ml-2 text-white font-medium">{video.content_type}</span>
-                  </div>
-                  <div>
+                  </div> */}
+                  {/* <div>
                     <span className="text-gray-400">Upload:</span>
                     <span className="ml-2 text-white font-medium">{formatDate(video.upload_time)}</span>
-                  </div>
+                  </div> */}
                   {video.completion_time && (
                     <div>
                       <span className="text-gray-400">Traité le:</span>
                       <span className="ml-2 text-white font-medium">{formatDate(video.completion_time)}</span>
                     </div>
                   )}
-                  <div className="col-span-2">
+                  {/* <div className="col-span-2">
                     <span className="text-gray-400">ID:</span>
                     <span className="ml-2 text-blue-400 font-mono text-xs">{video.video_id}</span>
-                  </div>
+                  </div> */}
                 </div>
+
+                {subtitleResult?.subtitle_text && (
+                  <div className="mt-2 bg-gray-900/50 p-2 rounded text-gray-300  overflow-y-auto">
+                    {subtitleResult?.subtitle_text.substring(0, 500)}...
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -360,9 +364,9 @@ export default function VideoDetailPage() {
             <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-2 mb-6 border-b border-gray-700 pb-4">
                 <h3 className="text-xl font-bold flex items-center gap-2">
-                  📡 Rapport des Pods
+                  📡 Détail de la vidéo et rapport de traitement
                 </h3>
-                <span className="text-xs bg-gray-700 px-2 py-1 rounded">KUBERNETES</span>
+                {/* <span className="text-xs bg-gray-700 px-2 py-1 rounded">KUBERNETES</span> */}
               </div>
 
               {video.status === 'completed' ? (
@@ -386,19 +390,19 @@ export default function VideoDetailPage() {
                   </PodStatusCard>
 
                   {/* Pod 2: Compression/Downscale */}
-                  <PodStatusCard name="Downscale Pod" icon="📉" color="#2ecc71">
+                  <PodStatusCard name="Résolution" icon="📉" color="#2ecc71">
                     {compressionResult ? (
                       <div className="text-sm">
                         <p className="text-white font-semibold">
                           {compressionResult.resolution || 'Optimisé'}
                         </p>
-                        {compressionResult.metadata && (
+                        {compressionResult && (
                           <div className="text-gray-400 text-xs mt-1">
-                            {compressionResult.metadata.compression_ratio && (
-                              <p>Ratio: {compressionResult.metadata.compression_ratio}</p>
+                            {compressionResult.compression_ratio && (
+                              <p>Ratio: {compressionResult.compression_ratio}</p>
                             )}
-                            {compressionResult.metadata.compressed_size && (
-                              <p>Taille: {formatFileSize(compressionResult.metadata.compressed_size)}</p>
+                            {compressionResult.compressed_size && (
+                              <p>Taille: {compressionResult.compressed_size} MB</p>
                             )}
                           </div>
                         )}
@@ -409,7 +413,7 @@ export default function VideoDetailPage() {
                   </PodStatusCard>
 
                   {/* Pod 3: Subtitle Generation */}
-                  <PodStatusCard name="Subtitle Pod" icon="📝" color="#9b59b6">
+                  {/* <PodStatusCard name="Subtitle Pod" icon="📝" color="#9b59b6">
                     {subtitleResult ? (
                       <div className="text-sm">
                         <p className="text-white font-semibold">
@@ -427,37 +431,37 @@ export default function VideoDetailPage() {
                     ) : (
                       <p className="text-gray-500 text-sm">Résultat non disponible</p>
                     )}
-                  </PodStatusCard>
+                  </PodStatusCard> */}
 
                   {/* Pod 4: Animal Detection */}
                   <div className="bg-gray-800/70 p-4 rounded-lg border-l-4 border-orange-500">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl">🐾</span>
                       <div className="flex-1">
-                        <div className="text-xs text-gray-400 uppercase font-bold">Animal Detect Pod</div>
+                        <div className="text-xs text-gray-400 uppercase font-bold">Animaux détectés</div>
                         {animalResult ? (
                           <div className="mt-2">
                             {animalResult.detection_summary && animalResult.detection_summary.animals_detected && 
                              Object.keys(animalResult.detection_summary.animals_detected).length > 0 ? (
                               <div>
-                                <p className="text-sm text-gray-300 mb-2">
+                                {/* <p className="text-sm text-gray-300 mb-2">
                                   {animalResult.detection_summary.total_detections} détection(s) - {animalResult.detection_summary.unique_classes} classe(s)
-                                </p>
+                                </p> */}
                                 <div className="flex flex-wrap gap-2">
                                   {Object.entries(animalResult.detection_summary.animals_detected).map(([animal, count]) => (
                                     <span 
                                       key={animal} 
                                       className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold"
                                     >
-                                      {animal}: {count}
+                                      {animal}
                                     </span>
                                   ))}
                                 </div>
-                                {animalResult.video_info && (
+                                {/* {animalResult.video_info && (
                                   <p className="text-xs text-gray-500 mt-2">
                                     {animalResult.video_info.processed_frames}/{animalResult.video_info.total_frames} frames analysées
                                   </p>
-                                )}
+                                )} */}
                               </div>
                             ) : (
                               <p className="text-gray-500 text-sm">Aucun animal détecté</p>

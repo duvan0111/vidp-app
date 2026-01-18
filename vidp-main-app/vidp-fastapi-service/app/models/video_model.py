@@ -142,7 +142,7 @@ class CompressionResult(BaseModel):
     status: ProcessingStatus
     resolution: Optional[str] = None
     original_size: Optional[str] = None
-    compressed_size: Optional[str] = None
+    compressed_size: Optional[float] = None
     compression_ratio: Optional[str] = None
     output_path: Optional[str] = None
     processing_time: Optional[float] = None

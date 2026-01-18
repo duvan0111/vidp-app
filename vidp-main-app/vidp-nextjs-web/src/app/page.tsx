@@ -7,8 +7,8 @@ const API_LIST_URL = 'http://localhost:8000/api/v1/videos/'
 const API_GLOBAL_PROCESSING_URL = 'http://localhost:8000/api/v1/processing/process-video'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const API_ANIMAL_DETECTION_URL = 'http://localhost:8000/api/v1/processing/animal-detection'
-// Service de visualisation/streaming (vidp-cloud-visualisation-app)
-const API_VISUALISATION_URL = 'http://100.48.20.184:8006'
+// Nouvelle constante pour le streaming via main-app
+const API_STREAMING_URL = 'http://localhost:8000/api/v1/videos/stream/'
 
 // Types d'upload
 type UploadState = 'IDLE' | 'SELECTED' | 'UPLOADING' | 'SUCCESS' | 'ERROR'
@@ -125,7 +125,7 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
   // Paramètres configurables du pipeline
   const [pipelineOptions, setPipelineOptions] = useState({
     languageDetectionDuration: 30,
-    targetResolution: '720p',
+    targetResolution: '360p',
     crf: 23,
     subtitleModel: 'tiny',
     subtitleLanguage: 'auto',
@@ -510,7 +510,7 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
               <button
                 onClick={() => setPipelineOptions({
                   languageDetectionDuration: 30,
-                  targetResolution: '720p',
+                  targetResolution: '360p',
                   crf: 23,
                   subtitleModel: 'tiny',
                   subtitleLanguage: 'auto',
@@ -1014,34 +1014,11 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
 // Composant VideoList - Affiche les vidéos traitées
 function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: () => void }) {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null)
-  const [streamingUrls, setStreamingUrls] = useState<Record<string, string>>({})
 
-  // Récupérer l'URL de streaming depuis le service de visualisation
-  const getStreamingUrl = async (sourceVideoId: string): Promise<string | null> => {
-    try {
-      const response = await fetch(`${API_VISUALISATION_URL}/api/videos/by-source/${sourceVideoId}`)
-      if (response.ok) {
-        const data = await response.json()
-        // Construire l'URL de streaming avec l'ID de la vidéo agrégée
-        return `${API_VISUALISATION_URL}${data.streaming_url}`
-      }
-    } catch (error) {
-      console.error(`Erreur lors de la récupération de l'URL de streaming pour ${sourceVideoId}:`, error)
-    }
-    return null
+  // L'URL de streaming provient désormais du main-app
+  const getStreamingUrl = (videoId: string): string => {
+    return `${API_STREAMING_URL}${videoId}`
   }
-
-  // Charger l'URL de streaming quand une vidéo est sélectionnée
-  useEffect(() => {
-    if (selectedVideo && !streamingUrls[selectedVideo]) {
-      getStreamingUrl(selectedVideo).then(url => {
-        if (url) {
-          setStreamingUrls(prev => ({ ...prev, [selectedVideo]: url }))
-        }
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVideo])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -1081,13 +1058,13 @@ function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: 
           <span>🎥</span>
           <span>Vidéos traitées ({completedVideos.length})</span>
         </h2>
-        <button
+        {/* <button
           onClick={onRefresh}
           className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
         >
           <span>🔄</span>
           <span>Actualiser</span>
-        </button>
+        </button> */}
       </div>
 
       {completedVideos.length === 0 ? (
@@ -1115,21 +1092,21 @@ function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: 
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
-                      <span>📊</span>
+                      <span className='text-gray-400'>📊 Taille :</span>
                       <span>{formatFileSize(video.file_size)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span>🕒</span>
+                      <span className='text-gray-400'>🕒 Lancé le :</span>
                       <span>{formatDate(video.upload_time)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <span>🆔</span>
                       <span className="truncate">{video.video_id}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
+                    </div> */}
+                    {/* <div className="flex items-center gap-2">
                       <span>📝</span>
                       <span>{video.content_type}</span>
-                    </div>
+                    </div> */}
                   </div>
                   {/* Bouton de détails */}
                   <div className="mt-3">
@@ -1140,7 +1117,7 @@ function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: 
                         e.stopPropagation()
                       }}
                     >
-                      🔍 Voir les détails complets
+                      🔍 Consulter le résultat
                     </a>
                   </div>
                 </div>
@@ -1149,24 +1126,16 @@ function VideoList({ videos, onRefresh }: { videos: VideoMetadata[], onRefresh: 
                 </div>
               </div>
 
+              {/* Affichage du lecteur vidéo uniquement si sélectionné */}
               {selectedVideo === video.video_id && (
                 <div className="mt-4 pt-4 border-t border-gray-700">
-                  {streamingUrls[video.video_id] ? (
-                    <video
-                      controls
-                      className="w-full rounded-lg bg-black"
-                      src={streamingUrls[video.video_id]}
-                    >
-                      Votre navigateur ne supporte pas la lecture vidéo.
-                    </video>
-                  ) : (
-                    <div className="w-full aspect-video bg-black rounded-lg flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                        <p className="text-gray-400 text-sm">Chargement du flux vidéo...</p>
-                      </div>
-                    </div>
-                  )}
+                  <video
+                    controls
+                    className="w-full rounded-lg bg-black"
+                    src={getStreamingUrl(video.video_id)}
+                  >
+                    Votre navigateur ne supporte pas la lecture vidéo.
+                  </video>
                 </div>
               )}
             </div>
@@ -1217,13 +1186,13 @@ function ProcessingVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRe
           <span>⚙️</span>
           <span>Traitement en cours ({processingVideos.length})</span>
         </h2>
-        <button
+        {/* <button
           onClick={onRefresh}
           className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
         >
           <span>🔄</span>
           <span>Actualiser</span>
-        </button>
+        </button> */}
       </div>
 
       {processingVideos.length === 0 ? (
@@ -1236,7 +1205,7 @@ function ProcessingVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRe
           {processingVideos.map((video) => (
             <div
               key={video.video_id}
-              className="bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-600/50 rounded-lg p-4"
+              className="bg-linear-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-600/50 rounded-lg p-4"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -1272,7 +1241,7 @@ function ProcessingVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRe
                     {/* Barre de progression */}
                     <div className="bg-gray-700 rounded-full h-2 overflow-hidden">
                       <div 
-                        className="bg-gradient-to-r from-yellow-500 to-orange-500 h-full transition-all duration-500"
+                        className="bg-linear-to-r from-yellow-500 to-orange-500 h-full transition-all duration-500"
                         style={{ width: `${getProgress(video)}%` }}
                       />
                     </div>
@@ -1360,13 +1329,13 @@ function FailedVideos({ videos, onRefresh }: { videos: VideoMetadata[], onRefres
           <span>❌</span>
           <span>Échecs ({failedVideos.length})</span>
         </h2>
-        <button
+        {/* <button
           onClick={onRefresh}
           className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
         >
           <span>🔄</span>
           <span>Actualiser</span>
-        </button>
+        </button> */}
       </div>
 
       <div className="grid gap-4">
@@ -1436,7 +1405,7 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold mb-4 bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             Pipeline hybride de traitement vidéo (VidP)
           </h1>
           <p className="text-gray-300 text-lg max-w-2xl mx-auto">
