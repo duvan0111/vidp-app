@@ -31,23 +31,27 @@ spec:
               value: "1.1.0"
           resources:
             requests:
-              memory: "512Mi"
+              memory: "1Gi"
               cpu: "500m"
             limits:
-              memory: "1Gi"
+              memory: "2Gi"
               cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /
               port: 8001
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
+            periodSeconds: 30
+            failureThreshold: 6
           readinessProbe:
             httpGet:
               path: /
               port: 8001
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
             periodSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: downscale-storage
               mountPath: /app/video_storage

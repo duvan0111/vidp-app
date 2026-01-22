@@ -66,18 +66,29 @@ spec:
             exec:
               command:
                 - mongosh
+                - --username
+                - "$(MONGO_INITDB_ROOT_USERNAME)"
+                - --password
+                - "$(MONGO_INITDB_ROOT_PASSWORD)"
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 45 # Augmenté pour laisser Mongo s'initialiser
+            periodSeconds: 20
+            timeoutSeconds: 10
           readinessProbe:
             exec:
               command:
                 - mongosh
+                - --username
+                - "$(MONGO_INITDB_ROOT_USERNAME)"
+                - --password
+                - "$(MONGO_INITDB_ROOT_PASSWORD)"
                 - --eval
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 10
+
       volumes:
         - name: mongodb-data
           persistentVolumeClaim:

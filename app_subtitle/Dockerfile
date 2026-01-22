@@ -11,7 +11,10 @@ WORKDIR /app
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Installer torch séparément pour éviter les erreurs de hash
+# Replace the old RUN command with this one
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

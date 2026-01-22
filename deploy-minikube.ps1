@@ -105,11 +105,10 @@ function Status-Minikube {
   & minikube status | Out-Host
   Write-Host ""
 
-  Write-Info "Pods dans le namespace $NAMESPACE:"
+  Write-Info "Pods dans le namespace ${NAMESPACE}:"
   try { & kubectl get pods -n $NAMESPACE | Out-Host } catch { Write-Warn "Namespace $NAMESPACE non trouvé" }
   Write-Host ""
-
-  Write-Info "Services dans le namespace $NAMESPACE:"
+  Write-Info "Services dans le namespace ${NAMESPACE}:"
   try { & kubectl get services -n $NAMESPACE | Out-Host } catch { Write-Warn "Namespace $NAMESPACE non trouvé" }
 }
 
@@ -119,6 +118,7 @@ function Use-MinikubeDocker {
   Write-Info "Configuration de Docker pour Minikube..."
   $envCmd = & minikube docker-env --shell powershell
   if (-not $envCmd) { throw "Impossible de récupérer 'minikube docker-env'." }
+  $envCmd = $envCmd -join "`n"
   Invoke-Expression $envCmd
 }
 
@@ -238,7 +238,7 @@ function Show-Logs([string]$svc) {
     return
   }
 
-  Write-Info "Logs de $svc:"
+  Write-Info "Logs de ${svc}:"
   & kubectl logs -f -l ("app=" + $svc) -n $NAMESPACE --tail=100 | Out-Host
 }
 
@@ -283,8 +283,8 @@ function Port-Forward {
   try {
     Wait-Job -Job $job1, $job2 | Out-Null
   } finally {
-    Get-Job -State Running | Stop-Job -Force -ErrorAction SilentlyContinue
-    Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
+    Get-Job -State Running | Stop-Job -ErrorAction SilentlyContinue
+    Get-Job | Remove-Job -ErrorAction SilentlyContinue
   }
 }
 

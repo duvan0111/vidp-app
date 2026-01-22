@@ -2,14 +2,18 @@
 
 import { useState, useRef, DragEvent, useEffect } from 'react'
 
-// Constantes d'API
-const API_LIST_URL = 'http://localhost:8000/api/v1/videos/'
-const API_GLOBAL_PROCESSING_URL = 'http://localhost:8000/api/v1/processing/process-video'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const API_ANIMAL_DETECTION_URL = 'http://localhost:8000/api/v1/processing/animal-detection'
-// Nouvelle constante pour le streaming via main-app
-const API_STREAMING_URL = 'http://localhost:8000/api/v1/videos/stream/'
 
+// Utilisez l'URL de l'Ingress que votre PC peut résoudre via le fichier hosts
+const API_BASE = 'http://localhost:8000'
+
+const API_LIST_URL = `${API_BASE}/api/v1/videos/`
+const API_GLOBAL_PROCESSING_URL = `${API_BASE}/api/v1/processing/process-video`
+const API_STREAMING_URL = `${API_BASE}/api/v1/videos/stream/`
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const API_ANIMAL_DETECTION_URL = `${API_BASE}/api/v1/processing/animal-detection`
+
+
+// Nouvelle constante pour le streaming via main-app
 // Types d'upload
 type UploadState = 'IDLE' | 'SELECTED' | 'UPLOADING' | 'SUCCESS' | 'ERROR'
 type VideoStatus = 'uploaded' | 'processing' | 'completed' | 'failed'
