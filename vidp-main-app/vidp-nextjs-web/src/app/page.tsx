@@ -1431,7 +1431,7 @@ export default function Home() {
             {/* Colonne gauche - Traitement */}
             <div className="space-y-8">
               <ProcessingVideos videos={videos} onRefresh={fetchVideos} />
-              <FailedVideos videos={videos} onRefresh={fetchVideos} />
+              {/* <FailedVideos videos={videos} onRefresh={fetchVideos} /> */}
             </div>
 
             {/* Colonne droite - Liste des vidéos */}
