@@ -552,32 +552,3 @@ uvicorn main:app --log-level debug
 3. **Rate limiting** : Limiter le nombre de requêtes
 4. **HTTPS** : Utiliser un reverse proxy (Nginx, Traefik)
 5. **Validation** : Vérifier l'intégrité des fichiers uploadés
-
-## 📝 Licence
-
-Ce projet est développé dans le cadre du cours **INF5141 Cloud Computing** - Master 2 Data Science.
-
-## 👥 Auteurs
-
-Projet VidP - Application de traitement de sous-titres vidéo
-
-## 🤝 Contribution
-
-Pour contribuer au projet :
-
-1. Fork le repository
-2. Créer une branche (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Commit les changements (`git commit -m 'Ajout nouvelle fonctionnalité'`)
-4. Push vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
-5. Ouvrir une Pull Request
-
-## 📞 Support
-
-Pour toute question ou problème :
-- Consulter la documentation : http://localhost:8003/docs
-- Vérifier les logs dans la console
-- Créer une issue sur le repository du projet
-
----
-
-**Made with ❤️ using FastAPI and Whisper AI**

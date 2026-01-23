@@ -298,23 +298,6 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 - ✅ **Nettoyage garanti** : Bloc `finally` pour assurer la suppression même en cas d'erreur
 - ✅ **Pas de traces** : Aucun historique des vidéos traitées
 
-### Recommandations pour la production
-- Ajoutez une authentification (OAuth2, JWT)
-- Implémentez un rate limiting pour éviter les abus
-- Utilisez HTTPS pour le chiffrement des données en transit
-- Configurez des limites de taille de fichiers
-- Ajoutez un système de logs pour l'audit (sans stocker les vidéos)
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-- Signaler des bugs
-- Proposer de nouvelles fonctionnalités
-- Améliorer la documentation
-
-## 📝 Licence
-
-Ce projet est fourni à des fins éducatives dans le cadre du cours INF5141 Cloud Computing.
 
 ## 🔗 Liens utiles
 
@@ -322,10 +305,3 @@ Ce projet est fourni à des fins éducatives dans le cadre du cours INF5141 Clou
 - [Documentation FastAPI](https://fastapi.tiangolo.com/)
 - [Dataset COCO](https://cocodataset.org/)
 
-## 👨‍💻 Auteur
-
-Projet réalisé dans le cadre du Master 2 Data Science - INF5141 Cloud Computing
-
----
-
-**⚠️ Note importante** : Cette application **ne conserve aucune vidéo** sur le serveur. Tous les fichiers uploadés sont automatiquement supprimés après traitement, garantissant ainsi la confidentialité des données. L'application est conçue à des fins de démonstration et d'apprentissage. Pour une utilisation en production, implémentez les mesures de sécurité appropriées mentionnées ci-dessus.

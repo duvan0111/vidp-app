@@ -340,5 +340,3 @@ kubectl logs --tail=100 <pod-name> -n vidp-processing
 ⚠️ **Aucun fichier de log n'est conservé** sur le système de fichiers. Les logs sont gérés par l'orchestrateur (Docker/Kubernetes) et peuvent être collectés via des outils externes (ELK, Grafana Loki, etc.).
 
 ---
-
-**Développé pour le projet VidP - Master 2 DS - INF5141 Cloud Computing**

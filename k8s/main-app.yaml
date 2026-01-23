@@ -38,7 +38,7 @@ spec:
             - name: LOCAL_VIDEO_PATH
               value: "/app/local_storage/videos"
             - name: MICROSERVICES_TIMEOUT
-              value: "1800"
+              value: "9000"
           resources:
             requests:
               memory: "256Mi"

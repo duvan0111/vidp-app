@@ -6,6 +6,24 @@
     "schemaVersion": 16,
     "version": 0,
     "refresh": "10s",
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "default",
+            "value": "default"
+          },
+          "hide": 0,
+          "label": "Namespace",
+          "name": "namespace",
+          "options": [],
+          "query": "label_values(kube_pod_info{container!=\"\"}, namespace)",
+          "refresh": 1,
+          "regex": "",
+          "type": "query"
+        }
+      ]
+    },
     "panels": [
       {
         "id": 1,
@@ -19,7 +37,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (rate(container_network_receive_packets_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
+            "expr": "sum by (pod) (rate(container_network_receive_packets_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -54,7 +72,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
+            "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -89,7 +107,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m])) * 100",
+            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m])) * 100",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -125,7 +143,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}) / 1024 / 1024",
+            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}) / 1024 / 1024",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -160,7 +178,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (rate(container_network_transmit_packets_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
+            "expr": "sum by (pod) (rate(container_network_transmit_packets_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -195,7 +213,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
+            "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"}[1m]))",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -230,7 +248,7 @@
         },
         "targets": [
           {
-            "expr": "count by (pod) (kube_pod_status_phase{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\", phase=\"Running\"})",
+            "expr": "count by (pod) (kube_pod_status_phase{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\", phase=\"Running\"})",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }
@@ -253,7 +271,7 @@
         },
         "targets": [
           {
-            "expr": "sum by (pod) (kube_pod_container_status_restarts_total{namespace=\"vidp\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"})",
+            "expr": "sum by (pod) (kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"(animal-detect|downscale|frontend|langscale|main-app|mongodb|subtitle).*\"})",
             "legendFormat": "{{pod}}",
             "refId": "A"
           }

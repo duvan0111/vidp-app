@@ -208,6 +208,8 @@ async def list_all_videos():
         )
     
     videos = await mongodb_connector.list_all_videos()
+    # Log du nombre de vidéos récupéré dans le terminal
+    print(f"Nombre de vidéos récupéré : {len(videos)}")
     return videos
 
 

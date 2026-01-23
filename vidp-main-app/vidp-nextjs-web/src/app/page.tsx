@@ -1388,6 +1388,8 @@ export default function Home() {
       const response = await fetch(API_LIST_URL)
       if (response.ok) {
         const data = await response.json()
+        console.log(data);
+        
         setVideos(data)
       }
     } catch (error) {

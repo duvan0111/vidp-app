@@ -283,11 +283,20 @@ port_forward() {
     print_info ""
     print_info "Appuyez sur Ctrl+C pour arrêter"
     
+    # Store PIDs
+    local pids=()
+
+    # Trap for cleanup on exit
+    trap "kill ${pids[@]} 2>/dev/null; print_info 'Port-forwards arrêtés.'" EXIT INT TERM
+    
     # Lancer les port-forwards en arrière-plan
     kubectl port-forward svc/main-app-service 8000:8000 -n ${NAMESPACE} &
-    kubectl port-forward svc/frontend-service 3000:3000 -n ${NAMESPACE} &
+    pids+=($!) # Get PID of last background command
     
-    # Attendre
+    kubectl port-forward svc/frontend-service 3000:3000 -n ${NAMESPACE} &
+    pids+=($!) # Get PID of last background command
+    
+    # Attendre indéfiniment (until Ctrl+C)
     wait
 }
 

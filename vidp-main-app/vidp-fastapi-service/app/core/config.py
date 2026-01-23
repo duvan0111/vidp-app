@@ -35,9 +35,9 @@ class Settings(BaseSettings):
     downscale_service_url: str = Field(default="http://localhost:8001", env="DOWNSCALE_SERVICE_URL")
     subtitle_service_url: str = Field(default="http://localhost:8003", env="SUBTITLE_SERVICE_URL")
     animal_detection_service_url: str = Field(default="http://localhost:8004", env="ANIMAL_DETECTION_SERVICE_URL")
-    aggregation_service_url: str = Field(default="http://100.48.20.184:8006", env="AGGREGATION_SERVICE_URL")
+    aggregation_service_url: str = Field(default="http://load-balancer-aggregation-1561173798.us-east-1.elb.amazonaws.com", env="AGGREGATION_SERVICE_URL")
     # Timeout augmenté à 1 heure 30 minutes pour les traitements longs (vidéos volumineuses)
-    microservices_timeout: int = Field(default=9000, env="MICROSERVICES_TIMEOUT")
+    microservices_timeout: int = Field(default=18000, env="MICROSERVICES_TIMEOUT")
 
     class Config:
         env_file = ".env"

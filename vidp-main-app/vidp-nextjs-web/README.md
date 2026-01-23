@@ -155,14 +155,6 @@ L'application communique avec un service FastAPI qui doit fournir :
 - Réponses JSON avec `video_id` et `message`
 - Gestion des erreurs avec `detail`
 
-## 🎯 Fonctionnalités Futures
-
-- [ ] Prévisualisation vidéo
-- [ ] Upload multiple
-- [ ] Historique des uploads
-- [ ] Gestion des utilisateurs
-- [ ] Notifications en temps réel
-- [ ] Téléchargement des résultats traités
 
 ## 🐛 Dépannage
 
@@ -176,7 +168,3 @@ Configurez le backend FastAPI pour accepter les requêtes depuis `http://localho
 - Vérifiez la taille du fichier (max 500 MB)
 - Vérifiez le format (MP4, AVI, MOV supportés)
 - Contrôlez la console navigateur pour les erreurs détaillées
-
-## 📄 License
-
-Ce projet fait partie du système VidP développé dans le cadre du cours INF5141 Cloud Computing.

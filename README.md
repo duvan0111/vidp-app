@@ -2,6 +2,15 @@
 
 **VidP** est une plateforme de traitement vidéo basée sur une architecture microservices, conçue pour le déploiement sur Kubernetes. Le système permet la détection de langue, la détection d'animaux, la compression vidéo et la génération de sous-titres via une API REST unifiée.
 
+## 📦 Démarrage
+
+Pour commencer avec VidP, clonez le dépôt GitHub :
+
+```bash
+git clone https://github.com/duvan0111/vidp-app.git
+cd vidp-app
+```
+
 ## 📋 Vue d'Ensemble
 
 ### Architecture Microservices
@@ -26,91 +35,294 @@
 
 ---
 
-## ☸️ Déploiement Kubernetes (Minikube)
+## 🚀 Déploiement VidP sur Minikube
 
-### Prérequis Kubernetes
+Ce guide fournit des instructions pour déployer l'application VidP sur Minikube, avec des sections spécifiques pour les environnements Linux/macOS (Bash) et Windows (PowerShell).
+
+### Prérequis Généraux
 
 - **Minikube** 1.30+
 - **kubectl** 1.28+
-- **Docker** 20+
+- **Docker** 20+ (en cours d'exécution)
+- Au moins **8 GB de RAM** disponible pour Minikube
+- Au moins **4 CPUs** disponibles pour Minikube
+- **20 GB d'espace disque** pour Minikube
 
-### Déploiement rapide
+---
+
+
+### Déploiement sur Linux/macOS (Bash)
+
+Ce guide utilise le script `deploy-minikube.sh`.
+
+#### Démarrage rapide
 
 ```bash
 # Déploiement complet en une commande
 ./deploy-minikube.sh all
-
-# Ou avec Make
-make all
 ```
+Cette commande démarre Minikube, construit toutes les images Docker et déploie les services sur Kubernetes.
 
-### Commandes principales
+#### Commandes principales
 
-```bash
-# Démarrer Minikube
-./deploy-minikube.sh start
+| Commande | Description |
+|----------|-------------|
+| `./deploy-minikube.sh start` | Démarrer Minikube |
+| `./deploy-minikube.sh build` | Construire toutes les images Docker |
+| `./deploy-minikube.sh deploy` | Déployer (manuel) |
+| `./deploy-minikube.sh kustomize` | Déployer avec Kustomize (recommandé) |
+| `./deploy-minikube.sh logs <service>` | Voir les logs d'un service (ex: `main-app`) |
+| `./deploy-minikube.sh urls` | Afficher les URLs d'accès (Frontend, API) |
+| `./deploy-minikube.sh forward` | Port-forward les services clés (Frontend: `localhost:3000`, API: `localhost:8000`) |
+| `./deploy-minikube.sh status` | Afficher le statut du cluster et des pods VidP |
+| `./deploy-minikube.sh delete` | Supprimer le déploiement VidP |
+| `./deploy-minikube.sh stop` | Arrêter Minikube |
 
-# Construire les images Docker
-./deploy-minikube.sh build
-
-# Déployer sur Kubernetes
-./deploy-minikube.sh deploy
-
-# Accéder aux services
-./deploy-minikube.sh forward
-# → Frontend: http://localhost:3000
-# → API: http://localhost:8000
-
-# Voir les logs
-./deploy-minikube.sh logs main-app
-
-# Statut du cluster
-./deploy-minikube.sh status
-
-# Supprimer le déploiement
-./deploy-minikube.sh delete
-```
-
-### Architecture K8s
+#### Architecture Kubernetes Déployée
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Kubernetes (Minikube)                     │
-│                      Namespace: vidp                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────┐     ┌─────────────────────────────────┐    │
-│  │  Frontend   │────▶│        Main App (Gateway)       │    │
-│  │  NodePort   │     │         NodePort 30080          │    │
-│  │   30030     │     └───────────────┬─────────────────┘    │
-│  └─────────────┘                     │                      │
-│                                      │                      │
-│         ┌───────────┬────────────────┼────────────┬─────┐   │
-│         │           │                │            │     │   │
-│    ┌────▼───┐ ┌─────▼────┐ ┌────────▼────┐ ┌─────▼───┐ │   │
-│    │MongoDB │ │Langscale │ │  Downscale  │ │Subtitle │ │   │
-│    │ :27017 │ │  :8002   │ │   :8001     │ │  :8003  │ │   │
-│    └────────┘ └──────────┘ └─────────────┘ └─────────┘ │   │
-│                                                         │   │
-│                                            ┌────────────▼┐  │
-│                                            │Animal Detect│  │
-│                                            │    :8004    │  │
-│                                            └─────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+Namespace: vidp
+├── ConfigMap: vidp-config
+├── Secret: vidp-secrets
+├── PVC: mongodb-pvc (5Gi)
+│
+├── Deployment: mongodb (1 replica)
+│   └── Service: mongodb-service (ClusterIP:27017)
+│
+├── Deployment: langscale (1 replica)
+│   └── Service: langscale-service (ClusterIP:8002)
+│
+├── Deployment: downscale (1 replica)
+│   └── Service: downscale-service (ClusterIP:8001)
+│
+├── Deployment: subtitle (1 replica)
+│   └── Service: subtitle-service (ClusterIP:8003)
+│
+├── Deployment: animal-detect (1 replica)
+│   └── Service: animal-detect-service (ClusterIP:8004)
+│
+├── Deployment: main-app (1 replica)
+│   └── Service: main-app-service (NodePort:30080)
+│
+├── Deployment: frontend (1 replica)
+│   └── Service: frontend-service (NodePort:30030)
+│
+└── Ingress: vidp-ingress
 ```
 
-📖 **Documentation complète** : [KUBERNETES_DEPLOYMENT.md](KUBERNETES_DEPLOYMENT.md)
+📖 **Documentation complète pour Linux/macOS** : [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
 
 ---
 
-## 🚀 Démarrage Rapide
+
+### Déploiement sur Windows (PowerShell)
+
+Ce guide utilise le script `deploy-minikube.ps1`.
+
+#### Prérequis Windows
+
+- Windows 10 / 11 (64 bits)
+- Docker Desktop (WSL2 recommandé)
+- Minikube, kubectl, Helm installés et accessibles dans le PATH
+- PowerShell 5+ ou PowerShell 7+
+
+#### Autoriser l’exécution du script (1 seule fois)
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+#### Démarrage rapide
+
+```powershell
+.\deploy-minikube.ps1 all
+```
+Cette commande démarre Minikube, construit toutes les images Docker et déploie tous les services Kubernetes.
+
+#### Commandes principales
+
+| Commande | Description |
+|--------|------------|
+| `start` | Démarrer Minikube |
+| `stop` | Arrêter Minikube |
+| `status` | Statut du cluster |
+| `build` | Construire toutes les images Docker |
+| `deploy` | Déployer les services Kubernetes |
+| `kustomize` | Déployer avec Kustomize |
+| `rebuild <service>` | Rebuild et redéployer un service (ex: `main-app`) |
+| `logs <service>` | Voir les logs d'un service |
+| `health` | Vérifier la santé des services |
+| `urls` | Afficher les URLs d'accès Minikube |
+| `forward` | Port-forward (Frontend: `localhost:3000`, API: `localhost:8000`) |
+| `dashboard` | Ouvrir le dashboard Kubernetes |
+| `delete` | Supprimer le déploiement VidP |
+
+📖 **Documentation complète pour Windows** : [DEPLOYMENT_GUIDE_WINDOWS.md](DEPLOYMENT_GUIDE_WINDOWS.md)
+
+---
+
+
+## 📊 Monitoring Kubernetes avec Prometheus et Grafana
+
+Ce guide explique comment installer et configurer un système de monitoring pour votre cluster Kubernetes Minikube, en utilisant Prometheus pour la collecte de métriques et Grafana pour la visualisation.
+
+---
+
+### Architecture du Système de Monitoring
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    VOTRE NAVIGATEUR                         │
+│                                                             │
+│  http://localhost:3001  ← Interface Grafana                │
+│  http://localhost:9090  ← Interface Prometheus (debug)     │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ (kubectl port-forward)
+                       ↓
+┌─────────────────────────────────────────────────────────────┐
+│           CLUSTER KUBERNETES (Minikube)                     │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  NAMESPACE: monitoring                             │    │
+│  │                                                     │    │
+│  │  ┌──────────────┐       ┌──────────────┐          │    │
+│  │  │   Grafana    │◄──────│  Prometheus  │          │    │
+│  │  │   (Pod)      │       │    (Pod)     │          │    │
+│  │  └──────────────┘       └───────┬──────┘          │    │
+│  │                                  │                 │    │
+│  └──────────────────────────────────┼─────────────────┘    │
+│                                     │                      │
+│                                     │ (scrape métriques)   │
+│                                     ↓                      │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  NAMESPACE: default (vos applications)             │    │
+│  │                                                     │    │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌───────────┐  │    │
+│  │  │animal-detect│  │  downscale  │  │ frontend  │  │    │
+│  │  └─────────────┘  └─────────────┘  └───────────┘  │    │
+│  │                                                     │    │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌───────────┐  │    │
+│  │  │ langscale   │  │  main-app   │  │  mongodb  │  │    │
+│  │  └─────────────┘  └─────────────┘  └───────────┘  │    │
+│  │                                                     │    │
+│  │  ┌─────────────┐                                   │    │
+│  │  │  subtitle   │                                   │    │
+│  │  └─────────────┘                                   │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+
+### Installation sur Linux/macOS (Bash)
+
+Ce guide utilise le script `setup-monitoring.sh`.
+
+#### Prérequis
+
+- Minikube, kubectl, Helm installés
+- Minikube démarré avec `minikube start --cpus=4 --memory=8192 --disk-size=20g`
+
+#### Installation automatique
+
+```bash
+# Assurez-vous que le script est exécutable
+chmod +x setup-monitoring.sh
+
+# Installation complète automatique
+./setup-monitoring.sh install
+```
+Ce script installe Prometheus et Grafana dans le namespace `monitoring`.
+
+#### Accéder à Grafana
+
+```bash
+./setup-monitoring.sh dashboard
+```
+Puis ouvrez : 👉 http://localhost:3001
+Identifiants : `admin` / (affiché dans le terminal)
+
+#### Importer le Dashboard VidP
+
+1.  Ouvrez Grafana (http://localhost:3001).
+2.  Menu ☰ → **Dashboards** → **New** → **Import**.
+3.  Cliquez sur **Upload JSON file** et sélectionnez `vidp-grafana_dashboard.json`.
+4.  Sélectionnez la datasource **Prometheus**.
+5.  Cliquez sur **Import**.
+6.  **Important** : Dans le dashboard, assurez-vous de sélectionner le **namespace correct** de vos applications (`vidp` par défaut) dans le menu déroulant "Namespace" en haut.
+
+#### Dépannage
+
+-   **Aucune donnée dans Grafana** : Vérifiez que les pods de vos applications sont dans le namespace sélectionné dans le dashboard. Vérifiez également que Prometheus collecte les métriques (Prometheus UI, Status -> Targets).
+-   **Problèmes de port-forward** : Le port 3001 peut être déjà utilisé.
+
+📖 **Documentation complète pour Linux/macOS** : [monitoring_guide.md](monitoring_guide.md)
+
+---
+
+
+### Installation sur Windows (PowerShell)
+
+Ce guide utilise le script `setup-monitoring.ps1`.
+
+#### Prérequis Windows
+
+- Docker Desktop (avec Kubernetes désactivé)
+- Minikube, kubectl, Helm installés
+- Minikube démarré avec `minikube start --cpus=4 --memory=8192 --disk-size=20g`
+
+#### Autoriser l’exécution des scripts (1 seule fois)
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+#### Installation automatique
+
+```powershell
+.\setup-monitoring.ps1 install
+```
+Ce script installe Prometheus et Grafana dans le namespace `monitoring`.
+
+#### Accéder à Grafana
+
+```powershell
+.\setup-monitoring.ps1 dashboard
+```
+Puis ouvrez : 👉 http://localhost:3001
+Identifiants : `admin` / (affiché dans le terminal)
+
+#### Importer le Dashboard VidP
+
+1.  Ouvrez Grafana (http://localhost:3001).
+2.  Menu ☰ → **Dashboards** → **New** → **Import**.
+3.  Cliquez sur **Upload JSON file** et sélectionnez `vidp-grafana_dashboard.json`.
+4.  Sélectionnez la datasource **Prometheus**.
+5.  Cliquez sur **Import**.
+6.  **Important** : Dans le dashboard, assurez-vous de sélectionner le **namespace correct** de vos applications (`vidp` par défaut) dans le menu déroulant "Namespace" en haut.
+
+#### Dépannage
+
+-   **Problème de connexion réseau** : Si `helm repo add` échoue, vérifiez votre connexion internet, proxy ou pare-feu.
+-   **Aucun graphique visible** : Attendre 2 minutes, vérifier le namespace sélectionné dans Grafana (`vidp` ou `default`), vérifier la datasource Prometheus.
+
+📖 **Documentation complète pour Windows** : [MONITORING_GUIDE_WINDOWS.md](MONITORING_GUIDE_WINDOWS.md)
+
+---
+
+
+## 🚀 Démarrage Rapide (Local)
+
+Pour un développement local rapide sans Kubernetes, vous pouvez démarrer tous les services VidP directement.
 
 ### Prérequis
 
-- **Python** 3.8+ 
+- **Python** 3.8+
 - **MongoDB** 4.4+
 - **FFmpeg** 4.4+
 - **Ports libres** : 8000, 8001, 8002, 8003, 8004
+
 
 ### Installation en 3 étapes
 
@@ -126,6 +338,7 @@ done
 # 3. Démarrer tous les services
 ./start_all_services.sh
 ```
+
 
 ### Vérification
 
@@ -147,16 +360,20 @@ curl http://localhost:8000/api/v1/processing/health | jq
 
 ---
 
+
 ## 📚 Documentation
 
-### Guides Principaux
+### Guides Détaillés
 
 | Document | Description |
 |----------|-------------|
-| [KUBERNETES_DEPLOYMENT.md](KUBERNETES_DEPLOYMENT.md) | ☸️ **Déploiement Minikube** |
+| [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | ☸️ **Déploiement Minikube (Linux/macOS)** |
+| [DEPLOYMENT_GUIDE_WINDOWS.md](DEPLOYMENT_GUIDE_WINDOWS.md) | 💻 **Déploiement Minikube (Windows)** |
+| [monitoring_guide.md](monitoring_guide.md) | 📈 **Monitoring (Linux/macOS)** |
+| [MONITORING_GUIDE_WINDOWS.md](MONITORING_GUIDE_WINDOWS.md) | 📊 **Monitoring (Windows)** |
 | [START_SERVICES.md](START_SERVICES.md) | 🚀 Guide de démarrage local |
 | [TESTING_GUIDE.md](TESTING_GUIDE.md) | 🧪 Tests et validation |
-| [MICROSERVICES_INTEGRATION.md](vidp-main-app/MICROSERVICES_INTEGRATION.md) | 🔧 Intégration des microservices |
+| [vidp-main-app/MICROSERVICES_INTEGRATION.md](vidp-main-app/MICROSERVICES_INTEGRATION.md) | 🔧 Intégration des microservices |
 
 ### Documentation API
 
@@ -238,40 +455,6 @@ curl -X POST "http://localhost:8000/api/v1/processing/subtitles" \
 
 ---
 
-## 🛠️ Gestion des Services
-
-### Démarrer les Services
-
-```bash
-./start_all_services.sh
-```
-
-### Arrêter les Services
-
-```bash
-./stop_all_services.sh
-```
-
-### Redémarrer un Service Spécifique
-
-```bash
-# Exemple : Redémarrer app_langscale
-lsof -ti:8002 | xargs kill -9
-cd app_langscale
-uvicorn main:app --host 127.0.0.1 --port 8002 &
-```
-
-### Voir les Logs
-
-```bash
-# Tous les logs en temps réel
-tail -f app_langscale/langscale.log \
-         app_downscale/downscale.log \
-         app_subtitle/subtitle.log \
-         vidp-main-app/vidp-fastapi-service/main.log
-```
-
----
 
 ## 🏗️ Structure du Projet
 
@@ -320,6 +503,7 @@ vidp-app/
 
 ---
 
+
 ## 🔧 Configuration
 
 ### Variables d'Environnement
@@ -345,6 +529,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ---
 
+
 ## ☸️ Déploiement Kubernetes
 
 Pour déployer sur Kubernetes, suivre le guide détaillé :
@@ -365,23 +550,7 @@ cat vidp-main-app/KUBERNETES_ARCHITECTURE.md
 
 ---
 
-## 🧪 Tests
 
-### Tests Automatisés
-
-```bash
-# Tests Python complets
-python3 test_integration.py
-
-# Tests Bash rapides
-./test_quick.sh
-```
-
-### Tests Manuels
-
-Voir [TESTING_GUIDE.md](TESTING_GUIDE.md) pour des exemples détaillés.
-
----
 
 ## 🤝 Contribution
 
@@ -401,6 +570,7 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md) pour des exemples détaillés.
 
 ---
 
+
 ## 📊 Performances
 
 | Opération | Temps Moyen | Notes |
@@ -411,6 +581,7 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md) pour des exemples détaillés.
 | Sous-titres (base) | 120-600s | Modèle Whisper base |
 
 ---
+
 
 ## 🛡️ Sécurité
 
@@ -423,18 +594,21 @@ Voir [TESTING_GUIDE.md](TESTING_GUIDE.md) pour des exemples détaillés.
 
 ---
 
+
 ## 📝 License
 
-Ce projet est développé dans le cadre du cours **INF5141 Cloud Computing** à l'Université de Technologie de Compiègne (UTC).
+Ce projet est développé dans le cadre du cours **INF5141 Cloud Computing** à École Nationale Supérieure Polytechnique de Yaoundé (ENSPY).
 
 ---
+
 
 ## 👥 Équipe VidP
 
-**Master 2 Data Science - UTC**  
+**Niveau 5 Humanuté Numérique - ENSPY**  
 **Projet Cloud Computing - Janvier 2025**
 
 ---
+
 
 ## 🔗 Liens Utiles
 
@@ -447,4 +621,4 @@ Ce projet est développé dans le cadre du cours **INF5141 Cloud Computing** à 
 ---
 
 **Version** : 1.0.0  
-**Dernière mise à jour** : 3 janvier 2025
+**Dernière mise à jour** : 23 janvier 2026

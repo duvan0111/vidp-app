@@ -2,7 +2,7 @@
 # filepath: setup-monitoring.sh
 #
 # Script d'installation du monitoring Prometheus + Grafana pour VidP
-# Usage: ./setup-monitoring.sh [install|uninstall|status|dashboard]
+# Usage: ./setup-monitoring.sh [install|uninstall|status|dashboard|test|import|help]
 
 set -e
 
@@ -14,8 +14,10 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 MONITORING_NAMESPACE="monitoring"
-VIDP_NAMESPACE="vidp"
+VIDP_NAMESPACE="vidp" # Namespace où les applications VidP sont déployées
 GRAFANA_PORT=3001
+LOCAL_CHART_DIR="$(dirname "${BASH_SOURCE[0]}")/helm-charts" # Dossier local pour les charts Helm
+LOCAL_KUBE_PROMETHEUS_STACK_PATTERN="${LOCAL_CHART_DIR}/kube-prometheus-stack-*.tgz" # Pattern pour trouver le chart local
 
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -71,10 +73,33 @@ check_prerequisites() {
 install_monitoring() {
     print_header "Installation de Prometheus + Grafana"
     
-    # Ajouter le repo Helm
-    print_info "Ajout du référentiel Helm Prometheus..."
-    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
-    helm repo update
+    local chart_source=""
+    # Chercher le chart localement. Utilise 'shopt -s nullglob' pour que ls ne retourne rien si pas de match
+    shopt -s nullglob
+    local local_chart_files=($LOCAL_KUBE_PROMETHEUS_STACK_PATTERN)
+    shopt -u nullglob # Désactive nullglob après utilisation
+
+    if [ ${#local_chart_files[@]} -gt 0 ]; then
+        local_chart_file="${local_chart_files[0]}" # Prendre le premier fichier trouvé
+        print_info "Chart Helm local trouvé: ${local_chart_file}. Utilisation de ce chart."
+        chart_source="${local_chart_file}"
+    else
+        print_info "Chart Helm local non trouvé. Tentative d'ajout du repo Helm distant."
+        print_info "Ajout du référentiel Helm Prometheus..."
+        if ! helm repo add prometheus-community https://prometheus-community.github.io/helm-charts; then
+            print_error "Échec de l'ajout du repo Helm. Vérifiez votre connexion internet, proxy ou pare-feu."
+            exit 1
+        fi
+        print_success "Repo Helm 'prometheus-community' ajouté."
+
+        print_info "Mise à jour des repos Helm..."
+        if ! helm repo update; then
+            print_warning "Avertissement: Échec de la mise à jour des repos Helm. Cela peut être dû à des problèmes de connexion."
+            # Ne pas quitter ici, car l'installation peut encore fonctionner si le chart spécifique est en cache.
+        fi
+        print_success "Repos Helm mis à jour."
+        chart_source="prometheus-community/kube-prometheus-stack"
+    fi
     
     # Créer le namespace monitoring
     print_info "Création du namespace ${MONITORING_NAMESPACE}..."
@@ -82,14 +107,17 @@ install_monitoring() {
     
     # Installer la stack kube-prometheus
     print_info "Installation de kube-prometheus-stack (cela peut prendre 5 minutes)..."
-    helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
-        --namespace ${MONITORING_NAMESPACE} \
+    if ! helm upgrade --install prometheus "${chart_source}" \
+        --namespace "${MONITORING_NAMESPACE}" \
         --set prometheus.prometheusSpec.retention=7d \
         --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
         --set grafana.adminPassword=admin123 \
         --set grafana.service.type=NodePort \
         --set grafana.service.nodePort=30301 \
-        --wait --timeout 10m
+        --wait --timeout 10m; then
+        print_error "Échec de l'installation de kube-prometheus-stack."
+        exit 1
+    fi
     
     print_success "Installation terminée!"
     
@@ -213,37 +241,55 @@ test_metrics() {
     
     # Port-forward Prometheus
     print_info "Démarrage du port-forward Prometheus..."
-    kubectl port-forward -n ${MONITORING_NAMESPACE} svc/prometheus-operated 9090:9090 &
-    PF_PID=$!
     
-    sleep 3
+    local pf_pids=()
+    # Trap for cleanup on exit
+    trap "kill ${pf_pids[@]} 2>/dev/null; print_info 'Port-forwards arrêtés.'" EXIT INT TERM
+
+    kubectl port-forward -n ${MONITORING_NAMESPACE} svc/prometheus-operated 9090:9090 &
+    pf_pids+=($!)
+    
+    sleep 5 # Give it some time to establish the port-forward
     
     # Tester quelques requêtes
+    local success_count=0
+    local fail_count=0
+
+    # Test network metrics
     print_info "Test des métriques réseau..."
-    NETWORK_METRICS=$(curl -s "http://localhost:9090/api/v1/query?query=container_network_receive_packets_total" | jq -r '.data.result | length')
-    
+    NETWORK_METRICS=$(curl -s "http://localhost:9090/api/v1/query?query=container_network_receive_packets_total{namespace='${VIDP_NAMESPACE}'}" | jq -r '.data.result | length') # Filter by VIDP_NAMESPACE
     if [ "$NETWORK_METRICS" -gt "0" ]; then
-        print_success "Métriques réseau disponibles: ${NETWORK_METRICS} séries temporelles"
+        print_success "Métriques réseau disponibles (${NETWORK_METRICS} séries temporelles)"
+        success_count=$((success_count + 1))
     else
-        print_warning "Aucune métrique réseau trouvée. Attendez 1-2 minutes."
+        print_warning "Aucune métrique réseau trouvée pour le namespace ${VIDP_NAMESPACE}. Attendez 1-2 minutes ou vérifiez le namespace."
+        fail_count=$((fail_count + 1))
     fi
     
+    # Test CPU metrics
     print_info "Test des métriques CPU..."
-    CPU_METRICS=$(curl -s "http://localhost:9090/api/v1/query?query=container_cpu_usage_seconds_total" | jq -r '.data.result | length')
-    
+    CPU_METRICS=$(curl -s "http://localhost:9090/api/v1/query?query=container_cpu_usage_seconds_total{namespace='${VIDP_NAMESPACE}'}" | jq -r '.data.result | length') # Filter by VIDP_NAMESPACE
     if [ "$CPU_METRICS" -gt "0" ]; then
-        print_success "Métriques CPU disponibles: ${CPU_METRICS} séries temporelles"
+        print_success "Métriques CPU disponibles (${CPU_METRICS} séries temporelles)"
+        success_count=$((success_count + 1))
     else
-        print_warning "Aucune métrique CPU trouvée"
+        print_warning "Aucune métrique CPU trouvée pour le namespace ${VIDP_NAMESPACE}. Attendez 1-2 minutes ou vérifiez le namespace."
+        fail_count=$((fail_count + 1))
+    fi
+
+    # Overall result
+    if [ "$fail_count" -eq "0" ]; then
+        print_success "Prometheus semble collecter les métriques VidP correctement."
+    else
+        print_warning "Certains tests de métriques ont échoué. Veuillez vérifier manuellement."
     fi
     
-    # Arrêter le port-forward
-    kill $PF_PID 2>/dev/null || true
+    # Kill port-forward (handled by trap on EXIT)
     
     echo ""
-    print_info "Pour voir toutes les métriques disponibles:"
+    print_info "Pour voir toutes les métriques disponibles directement:"
     echo "  kubectl port-forward -n ${MONITORING_NAMESPACE} svc/prometheus-operated 9090:9090"
-    echo "  Puis: http://localhost:9090"
+    echo "  Puis ouvrez: http://localhost:9090"
 }
 
 show_help() {
@@ -271,30 +317,30 @@ main() {
         install)
             check_prerequisites
             install_monitoring
-            ;;
+            ;; 
         uninstall)
             uninstall_monitoring
-            ;;
+            ;; 
         status)
             show_status
-            ;;
+            ;; 
         dashboard)
             open_grafana
-            ;;
+            ;; 
         import)
             import_dashboard
-            ;;
+            ;; 
         test)
             test_metrics
-            ;;
+            ;; 
         help|--help|-h|"")
             show_help
-            ;;
+            ;; 
         *)
             print_error "Commande inconnue: $1"
             show_help
             exit 1
-            ;;
+            ;; 
     esac
 }
 
