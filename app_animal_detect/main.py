@@ -74,7 +74,9 @@ async def get_animals():
 async def detect_video(
     file: UploadFile = File(...),
     confidence_threshold: float = 0.5,
-    save_video: bool = False  # Paramètre ajouté (ignoré car on ne sauvegarde jamais)
+    save_video: bool = False,
+    frame_step: int = 15,
+    resize_width: int = 640
 ):
     """
     Détecte les animaux dans une vidéo uploadée
@@ -83,6 +85,8 @@ async def detect_video(
         file: Fichier vidéo à analyser
         confidence_threshold: Seuil de confiance minimum (0-1)
         save_video: Ignoré - les vidéos ne sont jamais sauvegardées
+        frame_step: Le nombre de frames à sauter entre chaque analyse (1 = chaque frame, 15 = une frame sur 15, etc.)
+        resize_width: Largeur pour redimensionner les frames avant l'analyse (ex: 640). Maintient le ratio.
     
     Returns:
         JSON avec statistiques et détections par frame
@@ -91,6 +95,9 @@ async def detect_video(
     # Vérifier l'extension du fichier
     if not file.filename.endswith(('.mp4', '.avi', '.mov', '.mkv')):
         raise HTTPException(400, "Format vidéo non supporté. Utilisez .mp4, .avi, .mov ou .mkv")
+    
+    if frame_step < 1:
+        raise HTTPException(400, "frame_step doit être supérieur ou égal à 1")
     
     # Créer un fichier temporaire pour la vidéo uploadée
     temp_file = None
@@ -101,7 +108,7 @@ async def detect_video(
         temp_file.close()
         
         # Traiter la vidéo
-        results = process_video(temp_file.name, confidence_threshold)
+        results = process_video(temp_file.name, confidence_threshold, frame_step, resize_width)
         
         # Ajouter une note si save_video était demandé
         if save_video:
@@ -187,7 +194,9 @@ async def detect_frame(file: UploadFile = File(...), confidence_threshold: float
 
 def process_video(
     video_path: str, 
-    conf_threshold: float
+    conf_threshold: float,
+    frame_step: int = 1,
+    resize_width: int = None
 ) -> Dict:
     """Traite la vidéo et extrait les détections"""
     
@@ -198,29 +207,40 @@ def process_video(
     
     # Infos vidéo
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     # Statistiques
     frame_detections = []
     animals_count = {}
     frame_idx = 0
+    processed_frames_count = 0
     
     try:
-        while cap.isOpened():
+        while frame_idx < total_frames:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             success, frame = cap.read()
             
             if not success:
                 break
             
+            processed_frames_count += 1
+            
+            # Redimensionner la frame si nécessaire
+            if resize_width and resize_width < original_width:
+                aspect_ratio = original_height / original_width
+                new_height = int(resize_width * aspect_ratio)
+                if new_height > 0:
+                    frame = cv2.resize(frame, (resize_width, new_height))
+
             # Détection simple, car le suivi n'est pas requis
             results = model(frame, conf=conf_threshold)
             use_tracking = False
             
             frame_data = {
                 "frame": frame_idx,
-                "timestamp": round(frame_idx / fps, 2),
+                "timestamp": round(frame_idx / fps, 2) if fps > 0 else 0,
                 "detections": []
             }
             
@@ -252,7 +272,7 @@ def process_video(
             if frame_data["detections"]:
                 frame_detections.append(frame_data)
             
-            frame_idx += 1
+            frame_idx += frame_step
     
     finally:
         cap.release()
@@ -260,11 +280,11 @@ def process_video(
     # Résultats finaux
     return {
         "video_info": {
-            "duration_seconds": round(total_frames / fps, 2),
+            "duration_seconds": round(total_frames / fps, 2) if fps > 0 else 0,
             "fps": fps,
-            "resolution": f"{width}x{height}",
+            "resolution": f"{original_width}x{original_height}",
             "total_frames": total_frames,
-            "processed_frames": frame_idx
+            "processed_frames": processed_frames_count
         },
         "detection_summary": {
             "total_detections": sum(animals_count.values()),
