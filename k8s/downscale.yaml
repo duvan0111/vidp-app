@@ -9,6 +9,8 @@ metadata:
     tier: microservice
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: downscale
@@ -40,17 +42,17 @@ spec:
             httpGet:
               path: /
               port: 8001
-            initialDelaySeconds: 60
-            timeoutSeconds: 5
-            periodSeconds: 30
-            failureThreshold: 6
+            initialDelaySeconds: 900
+            periodSeconds: 600
+            timeoutSeconds: 60
+            failureThreshold: 18
           readinessProbe:
             httpGet:
               path: /
               port: 8001
-            initialDelaySeconds: 10
-            timeoutSeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 300
+            periodSeconds: 300
+            timeoutSeconds: 30
             failureThreshold: 6
           volumeMounts:
             - name: downscale-storage

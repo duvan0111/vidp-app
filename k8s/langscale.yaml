@@ -40,14 +40,14 @@ spec:
             httpGet:
               path: /
               port: 8002
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: 150
+            periodSeconds: 200
           readinessProbe:
             httpGet:
               path: /
               port: 8002
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 50
+            periodSeconds: 100
           volumeMounts:
             - name: langscale-storage
               mountPath: /app/language_detection_storage

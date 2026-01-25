@@ -9,6 +9,8 @@ metadata:
     tier: microservice
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: subtitle
@@ -40,18 +42,20 @@ spec:
               cpu: "1500m"
           livenessProbe:
             httpGet:
-              path: /
+              path: /api/health
               port: 8003
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
+            initialDelaySeconds: 900
+            periodSeconds: 600
+            timeoutSeconds: 60
+            failureThreshold: 18
           readinessProbe:
             httpGet:
-              path: /
+              path: /api/health
               port: 8003
-            initialDelaySeconds: 20
-            periodSeconds: 15
-            timeoutSeconds: 10
+            initialDelaySeconds: 300
+            periodSeconds: 300
+            timeoutSeconds: 30
+            failureThreshold: 6
           volumeMounts:
             - name: subtitle-storage
               mountPath: /app/output_videos

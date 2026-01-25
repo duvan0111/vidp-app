@@ -55,13 +55,14 @@ class MongoDBConnector:
         Returns:
             bool: True si la sauvegarde est réussie
         """
+        if self.collection is None:
+            print("save_video_metadata: Échec car self.collection est None. La connexion DB a probablement échoué au démarrage.")
+            return False
         try:
-            if self.collection is None:
-                return False
-            
             # Convertir en dict et gérer les dates
             metadata_dict = metadata.model_dump()
             await self.collection.insert_one(metadata_dict)
+            print(f"save_video_metadata: Métadonnées pour video_id {metadata.video_id} sauvegardées avec succès.")
             return True
         except Exception as e:
             print(f"Erreur lors de la sauvegarde des métadonnées: {e}")
@@ -77,10 +78,10 @@ class MongoDBConnector:
         Returns:
             VideoMetadata ou None si non trouvé
         """
+        if self.collection is None:
+            print(f"get_video_metadata: Échec car self.collection est None pour video_id {video_id}.")
+            return None
         try:
-            if self.collection is None:
-                return None
-            
             doc = await self.collection.find_one({"video_id": video_id})
             if doc:
                 # Supprimer le champ _id de MongoDB pour éviter les problèmes de sérialisation
@@ -102,10 +103,10 @@ class MongoDBConnector:
         Returns:
             bool: True si la mise à jour est réussie
         """
+        if self.collection is None:
+            print(f"update_video_status: Échec car self.collection est None pour video_id {video_id}.")
+            return False
         try:
-            if self.collection is None:
-                return False
-            
             result = await self.collection.update_one(
                 {"video_id": video_id},
                 {"$set": {"status": new_status}}
@@ -133,10 +134,10 @@ class MongoDBConnector:
         Returns:
             bool: True si la mise à jour est réussie
         """
+        if self.collection is None:
+            print(f"update_processing_stage: Échec car self.collection est None pour video_id {video_id}.")
+            return False
         try:
-            if self.collection is None:
-                return False
-            
             update_data = {"current_stage": current_stage}
             if stages_completed is not None:
                 update_data["stages_completed"] = stages_completed
@@ -159,10 +160,10 @@ class MongoDBConnector:
         Returns:
             List[VideoMetadata]: Liste des métadonnées
         """
+        if self.collection is None:
+            print("list_all_videos: Échec car self.collection est None. La connexion DB a probablement échoué au démarrage.")
+            return []
         try:
-            if self.collection is None:
-                return []
-            
             cursor = self.collection.find({}).sort("upload_time", -1)  # Tri par date décroissante
             videos = []
             async for doc in cursor:

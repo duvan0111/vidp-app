@@ -7,8 +7,8 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/proxy-body-size: "500m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "9000"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "9000"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "10800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "10800"
 spec:
   ingressClassName: nginx
   rules:

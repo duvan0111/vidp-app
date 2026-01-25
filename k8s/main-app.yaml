@@ -38,7 +38,7 @@ spec:
             - name: LOCAL_VIDEO_PATH
               value: "/app/local_storage/videos"
             - name: MICROSERVICES_TIMEOUT
-              value: "9000"
+              value: "10800"
           resources:
             requests:
               memory: "256Mi"
@@ -50,14 +50,14 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: 150
+            periodSeconds: 200
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 50
+            periodSeconds: 100
           volumeMounts:
             - name: video-storage
               mountPath: /app/local_storage

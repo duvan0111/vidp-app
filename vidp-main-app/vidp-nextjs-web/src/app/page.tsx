@@ -4,7 +4,7 @@ import { useState, useRef, DragEvent, useEffect } from 'react'
 
 
 // Utilisez l'URL de l'Ingress que votre PC peut résoudre via le fichier hosts
-const API_BASE = 'http://localhost:8000'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const API_LIST_URL = `${API_BASE}/api/v1/videos/`
 const API_GLOBAL_PROCESSING_URL = `${API_BASE}/api/v1/processing/process-video`
@@ -563,7 +563,7 @@ function VideoUploader({ onUploadSuccess }: { onUploadSuccess: () => void }) {
                 ou cliquez pour sélectionner un fichier
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                Formats supportés: MP4, AVI, MOV (max. 500 MB)
+                Formats supportés: MP4, AVI, MOV (max. 100 MB)
               </p>
             </div>
           </div>
